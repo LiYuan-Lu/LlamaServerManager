@@ -177,7 +177,7 @@ QJsonObject AgentServer::snapshot() const
         s["profile"] = instance->profile.toJson();
         list.append(s);
     }
-    return { { "instances", list }, { "warning", loadWarning } };
+    return { { "instances", list }, { "warning", loadWarning }, { "revision", Protocol::Revision } };
 }
 void AgentServer::broadcast(const QString& event, const QJsonObject& data)
 {
@@ -344,6 +344,11 @@ AgentServer::Reply AgentServer::updateProfile(Instance* instance, const QJsonObj
         return Reply::failure(error);
     }
     candidate.id = instance->profile.id;
+    // An older GUI does not know the alias option; keep it instead of turning it off.
+    if (!m["profile"].toObject().contains("aliasEnabled") && !candidate.aliasEnabled) {
+        candidate.aliasEnabled = instance->profile.aliasEnabled;
+        candidate.alias = instance->profile.alias;
+    }
     auto list = profiles();
     list[instances.indexOf(instance)] = candidate;
     if (!persist(list, error)) {

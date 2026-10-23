@@ -40,6 +40,12 @@ AgentClient::AgentClient(QString dir, bool launch, QObject* parent)
         pending.clear();
         buffer.clear();
         synced = false;
+        emit agentOutdatedChanged();
+        if (relaunch) {
+            // The old Agent has exited; give it a moment to release its lock, then start ours.
+            relaunch = false;
+            QTimer::singleShot(500, this, &AgentClient::launchAgent);
+        }
         clearMetrics();
         rebuild();
         emit busyChanged();
@@ -220,6 +226,15 @@ void AgentClient::shutdownAgent()
     setError({ });
     send("shutdownAgent");
 }
+void AgentClient::restartAgent()
+{
+    if (!connected()) {
+        launchAgent();
+        return;
+    }
+    relaunch = true;
+    shutdownAgent();
+}
 void AgentClient::launchAgent()
 {
     setStopped(false);
@@ -323,7 +338,12 @@ void AgentClient::applyStatus(const QJsonObject& data)
     }
     raw = next;
     agentWarning = data["warning"].toString();
+    const bool wasOutdated = agentOutdated();
+    revision = data["revision"].toInt();
     synced = true;
+    if (agentOutdated() != wasOutdated) {
+        emit agentOutdatedChanged();
+    }
     const bool idsChanged = nextIds != ids;
     ids = nextIds;
     rebuild();

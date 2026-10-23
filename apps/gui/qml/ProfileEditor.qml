@@ -48,6 +48,7 @@ ColumnLayout {
             if (values.concat(wd).some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
             if (name.text.trim().length === 0) throw new Error(qsTr("Enter a name for this model"))
             if (aliasMissing) throw new Error(qsTr("Enter an alias or turn the alias option off"))
+            if (agent.agentOutdated) throw new Error(qsTr("The running Agent is older than this app and would drop new settings. Restart the Agent from the main page first."))
             validationError = ""
             const profile = {name: name.text.trim(), executable: exe.text, model: model.text, workingDirectory: cwd.text,
                 host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],

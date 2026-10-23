@@ -17,6 +17,7 @@
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QLocalServer>
 #include <QLockFile>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -1170,6 +1171,112 @@ private slots:
         QCOMPARE(model["name"].toString(), QString("Speedy"));
         QVERIFY(rpc(socket, "shutdownAgent")["ok"].toBool());
         QVERIFY(agent.waitForFinished(20000));
+    }
+    void agentCompatibility()
+    {
+        // Profiles saved before the alias option: --alias moves out of the extra arguments.
+        Profile p;
+        QString error;
+        QVERIFY(Profile::fromJson({ { "extraArguments", QJsonArray { "--jinja", "--alias", "bonsai, other", "-a=x", "--temp", "1.0" } } }, p, error));
+        QVERIFY(p.aliasEnabled);
+        QCOMPARE(p.alias, QString("bonsai"));
+        QCOMPARE(p.extraArguments, (QStringList { "--jinja", "--temp", "1.0" }));
+        // Profiles in the new format must use the option.
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", false }, { "extraArguments", QJsonArray { "--alias", "x" } } }, p, error));
+
+        // A profiles.json written by an older Agent loads, is migrated, and is saved once.
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        auto legacy = profile(dir.path()).toJson();
+        legacy.remove("aliasEnabled");
+        legacy.remove("alias");
+        legacy["id"] = "legacy";
+        legacy["name"] = "Legacy";
+        legacy["extraArguments"] = QJsonArray { "--alias", "legacy-id" };
+        QFile file(dir.path() + "/profiles.json");
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QJsonDocument(QJsonObject { { "version", 2 }, { "profiles", QJsonArray { legacy } } }).toJson());
+        file.close();
+        {
+            ProfileStore store(dir.path());
+            QString warning;
+            bool changed = false;
+            const auto loaded = store.load(warning, &changed);
+            QVERIFY2(warning.isEmpty(), qPrintable(warning));
+            QVERIFY(changed);
+            QCOMPARE(loaded.size(), 1);
+            QVERIFY(loaded[0].aliasEnabled);
+            QCOMPARE(loaded[0].alias, QString("legacy-id"));
+            QVERIFY(loaded[0].extraArguments.isEmpty());
+        }
+
+        // The Agent reports its revision and saves the migration, keeping the old file as a backup.
+        QProcess agent;
+        struct Cleanup {
+            QProcess& p;
+            ~Cleanup()
+            {
+                p.kill();
+                p.waitForFinished(5000);
+            }
+        } cleanup { agent };
+        QLocalSocket socket;
+        QVERIFY(launchAgent(agent, socket, dir.path()));
+        QCOMPARE(rpc(socket, "getStatus")["data"].toObject()["revision"].toInt(), Protocol::Revision);
+        QVERIFY(QFile::exists(dir.path() + "/profiles.json.bak"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("\"aliasEnabled\": true"));
+        file.close();
+        // A GUI from before the alias option saves without it; the alias is kept.
+        auto old = instance(socket, "legacy")["profile"].toObject();
+        old.remove("aliasEnabled");
+        old.remove("alias");
+        old["name"] = "Renamed";
+        QVERIFY(rpc(socket, "updateProfile", { { "profileId", "legacy" }, { "profile", old } })["ok"].toBool());
+        const auto saved = instance(socket, "legacy")["profile"].toObject();
+        QCOMPARE(saved["name"].toString(), QString("Renamed"));
+        QVERIFY(saved["aliasEnabled"].toBool());
+        QCOMPARE(saved["alias"].toString(), QString("legacy-id"));
+        QVERIFY(rpc(socket, "shutdownAgent")["ok"].toBool());
+        QVERIFY(agent.waitForFinished(20000));
+    }
+    void clientRestartsOutdatedAgent()
+    {
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        // Stands in for an Agent from before revision 2: its status has no "revision".
+        QLocalServer old;
+        QLocalServer::removeServer(Protocol::endpoint(dir.path()));
+        QVERIFY(old.listen(Protocol::endpoint(dir.path())));
+        connect(&old, &QLocalServer::newConnection, this, [&old] {
+            auto* peer = old.nextPendingConnection();
+            connect(peer, &QLocalSocket::readyRead, peer, [peer, &old] {
+                while (peer->canReadLine()) {
+                    const auto m = QJsonDocument::fromJson(peer->readLine()).object();
+                    const auto command = m["command"].toString();
+                    const QJsonObject data = command == "getStatus" ? QJsonObject { { "instances", QJsonArray {} }, { "warning", "" } } : QJsonObject {};
+                    Protocol::send(peer, { { "version", 1 }, { "id", m["id"] }, { "ok", true }, { "error", "" }, { "data", data } });
+                    if (command == "shutdownAgent") {
+                        Protocol::send(peer, { { "version", 1 }, { "event", "shutdown" }, { "data", QJsonObject {} } });
+                        peer->flush();
+                        old.close();
+                        peer->disconnectFromServer();
+                        return;
+                    }
+                }
+            });
+        });
+        AgentClient client(dir.path(), false);
+        QTRY_VERIFY_WITH_TIMEOUT(client.agentOutdated(), 5000);
+        // Restart Agent: the old Agent stops, then this build's Agent is started and connected.
+        client.restartAgent();
+        QTRY_VERIFY_WITH_TIMEOUT(client.connected() && client.synchronized() && !client.agentOutdated(), 15000);
+        QVERIFY(!client.agentStopped());
+        QLocalSocket socket;
+        socket.connectToServer(Protocol::endpoint(dir.path()));
+        QVERIFY(socket.waitForConnected(3000));
+        QVERIFY(rpc(socket, "shutdownAgent")["ok"].toBool());
+        QTRY_VERIFY_WITH_TIMEOUT(!QFile::exists(dir.path() + "/agent.lock"), 20000);
     }
     void autoStartAndShutdown()
     {

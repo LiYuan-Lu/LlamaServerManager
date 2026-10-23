@@ -39,6 +39,10 @@ bool read(const QString& path, QList<Profile>& profiles, bool& changed, QByteArr
             if (!v.isObject() || !Profile::fromJson(v.toObject(), p, error)) {
                 return false;
             }
+            // Saved by an older Agent: write the new fields (and a migrated --alias) once.
+            if (!v.toObject().contains("aliasEnabled")) {
+                changed = true;
+            }
             result << p;
         }
     } else {

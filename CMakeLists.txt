@@ -72,7 +72,8 @@ if(BUILD_TESTING)
   target_compile_definitions(lsm-tests PRIVATE LSM_FAKE_NVML="$<TARGET_FILE:fake-nvml>")
   add_dependencies(lsm-tests fake-llama-server fake-nvml llama-manager-agent llama-manager)
   foreach(case restartPolicy healthMonitor systemMonitor gpuMonitor metricsCollector agentMetricsAndSettings logModel autoStartAndShutdown loginStartup guiSingleInstanceAndQuit watchdogStartupGrace watchdogCrashRecovery watchdogHealthRestart watchdogLimitsAndManualStop protocolFraming persistenceAndValidation boundedLogs processLifecycle failuresAndCancellation agentAndGuiReconnect guiDetachedAgent
-    aliasOption opencodeConfigBuild opencodeConfigFetch throughputMeter throughputMonitor clientThroughputAndOpencode)
+    aliasOption opencodeConfigBuild opencodeConfigFetch throughputMeter throughputMonitor clientThroughputAndOpencode
+    agentCompatibility clientRestartsOutdatedAgent)
     add_test(NAME ${case} COMMAND lsm-tests ${case} -o ${case}-results.txt,txt -o -,txt)
     set_tests_properties(${case} PROPERTIES TIMEOUT 180)
     if(WIN32)

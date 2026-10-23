@@ -183,7 +183,7 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 
 測試環境同上（Ubuntu 24.04、Qt 6.4.2、offscreen）。**尚未在 Windows 上執行，也尚未連接真正的 llama-server。**
 
-- 全部 targets 編譯成功（`-Wall -Wextra` 無警告）；`ctest` 27 項全部通過（`guiDetachedAgent` 在非 Windows 平台自動略過），連續 2 輪。
+- 全部 targets 編譯成功（`-Wall -Wextra` 無警告）；`ctest` 29 項全部通過（`guiDetachedAgent` 在非 Windows 平台自動略過），連續 2 輪。
 - 新增 `aliasOption`：`aliasEnabled` / `alias` 預設關閉、型別檢查與保存；啟用時不可為空、不可有前後空白、逗號或控制字元、最長 128 字；啟用時參數加上 `--alias`；額外參數不可設定 `-a` / `--alias`。
 - 新增 `opencodeConfigBuild`：沒有模型 ID 時回報錯誤；provider 與模型名稱等於模型頁名稱；`0.0.0.0` 轉為 `127.0.0.1`；有 `/props` 時用它的 context，沒有時用 `-c` 除以 `--parallel`；output 上限 8192；多個 ID 時名稱加上 ID；`--api-key` 會帶入 `apiKey`。
 - 新增 `opencodeConfigFetch`：對假 llama-server 實際讀取 `/v1/models`（回報 alias）與 `/props`；伺服器停止後回報錯誤、不產生設定。
@@ -193,3 +193,6 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 - GUI 截圖檢查：編輯頁的 Alias 勾選框（名稱連動、自訂後不再連動、清空時的警告與無法存檔）；模型頁的「opencode config」按鈕與對話框；資訊列的速度與「速度」分頁的圖表。
 
 尚未驗證：真正的 llama-server `/slots` 在長時間生成、多個處理槽同時生成、推測解碼（`n_decoded` 一次增加多個）時的數字；opencode 實際讀取產生的設定。
+- 新增 `agentCompatibility`：舊版存下、額外參數含 `--alias` 的 profiles.json 會轉成別名選項（逗號分隔時取第一個），Agent 讀取後存檔一次並留下 `.bak`；新格式仍不允許在額外參數設定 `--alias`；狀態帶有 `revision`；舊版 GUI 存檔時不帶別名欄位，別名會被保留。
+- 新增 `clientRestartsOutdatedAgent`：連到沒有 `revision` 的舊 Agent 時 `agentOutdated` 為 true；「重新啟動 Agent」會停止舊 Agent，再啟動並連上這個版本的 Agent。
+- 用使用者實際的 profiles.json 驗證轉換：兩個模型都能載入，第一個模型的 `--alias bonsai-2-27b` 移到別名選項，其餘設定不變。

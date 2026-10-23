@@ -1,5 +1,6 @@
 #pragma once
 #include "LogModel.h"
+#include "Protocol.h"
 #include <QHash>
 #include <QJsonObject>
 #include <QLocalSocket>
@@ -35,6 +36,9 @@ class AgentClient : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     // True after the user stopped the Agent: the GUI does not relaunch it until launchAgent().
     Q_PROPERTY(bool agentStopped READ agentStopped NOTIFY agentStoppedChanged)
+    // True while connected to an Agent older than this GUI (Protocol::Revision). Such an Agent
+    // drops profile fields it does not know, so the GUI blocks saving until it is restarted.
+    Q_PROPERTY(bool agentOutdated READ agentOutdated NOTIFY agentOutdatedChanged)
 public:
     explicit AgentClient(QString directory, bool autoLaunch = true, QObject* parent = nullptr);
     ~AgentClient() override;
@@ -54,6 +58,7 @@ public:
     QString error() const { return lastError; }
     bool busy() const { return !pending.isEmpty(); }
     bool agentStopped() const { return stoppedByUser; }
+    bool agentOutdated() const { return synced && revision < Protocol::Revision; }
     Q_INVOKABLE void connectAgent();
     Q_INVOKABLE void start(const QString& profileId);
     Q_INVOKABLE void stop(const QString& profileId);
@@ -69,6 +74,8 @@ public:
     Q_INVOKABLE void shutdownAgent();
     // Starts the Agent again after shutdownAgent().
     Q_INVOKABLE void launchAgent();
+    // Stops every model and the Agent, then starts this GUI's Agent (e.g. after an update).
+    Q_INVOKABLE void restartAgent();
     Q_INVOKABLE void clearError() { setError({}); }
     // Reads /v1/models and /props from the running model and emits opencodeConfigReady().
     Q_INVOKABLE void requestOpencodeConfig(const QString& profileId);
@@ -86,6 +93,7 @@ signals:
     void errorChanged();
     void busyChanged();
     void agentStoppedChanged();
+    void agentOutdatedChanged();
     // `config` is indented JSON for opencode.json; empty when `error` is set.
     void opencodeConfigReady(const QString& profileId, const QString& config, const QString& error);
 
@@ -132,5 +140,7 @@ private:
     QString selected, agentWarning, lastError;
     qint64 lastLaunch = 0;
     bool stoppedByUser = false;
+    bool relaunch = false;
+    int revision = 0;
     QHash<QString, Pending> pending;
 };

@@ -82,6 +82,10 @@ bool Profile::fromJson(const QJsonObject& o, Profile& p, QString& error)
         return false;
     }
     candidate.environment = o["environment"].toObject();
+    if (!o.contains("aliasEnabled")) {
+        // Saved before the alias option existed, when --alias could only be an extra argument.
+        candidate.adoptAliasArgument();
+    }
     if (o.contains("watchdog")) {
         if (!o["watchdog"].isObject()) {
             error = "watchdog must be an object";
@@ -174,6 +178,32 @@ QString Profile::displayName() const
     }
     const auto base = QFileInfo(model).completeBaseName();
     return base.isEmpty() ? QStringLiteral("Model") : base;
+}
+bool Profile::adoptAliasArgument()
+{
+    bool found = false;
+    for (int i = 0; i < extraArguments.size();) {
+        const auto& arg = extraArguments[i];
+        QString value;
+        if ((arg == "--alias" || arg == "-a") && i + 1 < extraArguments.size()) {
+            value = extraArguments[i + 1];
+            extraArguments.remove(i, 2);
+        } else if (arg.startsWith("--alias=") || arg.startsWith("-a=")) {
+            value = arg.section('=', 1);
+            extraArguments.removeAt(i);
+        } else {
+            ++i;
+            continue;
+        }
+        found = true;
+        // llama-server accepts a comma-separated list; the option keeps the first ID.
+        const auto first = value.section(',', 0, 0).trimmed();
+        if (!aliasEnabled && !first.isEmpty()) {
+            aliasEnabled = true;
+            alias = first.left(128);
+        }
+    }
+    return found;
 }
 QString Profile::apiKey() const
 {

@@ -37,6 +37,9 @@ struct Profile {
     QString validate(bool checkFiles = true) const;
     QStringList arguments() const;
     QString displayName() const;
+    // Moves --alias/-a from the extra arguments into the alias option (profiles saved before
+    // the option existed). Returns whether any was found.
+    bool adoptAliasArgument();
     // The first key of --api-key in the extra arguments, or empty.
     QString apiKey() const;
     static QString newId();

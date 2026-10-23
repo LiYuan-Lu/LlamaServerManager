@@ -77,6 +77,22 @@ ApplicationWindow {
         }
         onAccepted: agent.shutdownAgent()
     }
+    Dialog {
+        id: confirmRestartAgent
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Restart Agent")
+        width: 460
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            width: confirmRestartAgent.availableWidth
+            wrapMode: Text.Wrap
+            text: root.activeCount > 0
+                ? qsTr("Restart the Agent? %n running model(s) will be stopped. Start them again afterwards.", "", root.activeCount)
+                : qsTr("Restart the Agent? No models are running.")
+        }
+        onAccepted: agent.restartAgent()
+    }
 
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 20; spacing: 12
@@ -146,6 +162,20 @@ ApplicationWindow {
         }
         Label { text: agent.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Label { text: agent.warning || ""; visible: text.length > 0; color: "#fbbf24"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        // An Agent left running from an older version drops settings it does not know.
+        RowLayout {
+            visible: agent.connected && agent.agentOutdated
+            Layout.fillWidth: true; spacing: 12
+            Label {
+                text: qsTr("The running Agent is from an older version of this app. Restart it to use the alias option and the generation speed; saving profiles is disabled until then.")
+                color: "#fbbf24"; wrapMode: Text.Wrap; Layout.fillWidth: true
+            }
+            Button {
+                text: qsTr("Restart Agent")
+                enabled: !agent.busy
+                onClicked: confirmRestartAgent.open()
+            }
+        }
         Label { text: startup.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Label {
             visible: agent.agentStopped && !agent.connected

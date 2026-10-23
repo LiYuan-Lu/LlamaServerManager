@@ -43,6 +43,8 @@ Commands that act on one model take a `profileId` string. A missing or unknown `
 
 Each element of `instances` contains: id, name, state, pid, port, model, uptimeSeconds, error, arguments, profile, and the watchdog fields health (summary text such as `Healthy`, `Loading model (HTTP 503)`, `Failing 2/3: ...`, `Disabled`, `Not running`), healthFailures, autoRestart, restartAttempt, maxRestarts, restartsInWindow, and nextRestartSeconds (0 unless a restart is scheduled).
 
+The snapshot also carries `revision`, the Agent's feature level (`Protocol::Revision`; absent from Agents older than revision 2). An older Agent drops profile fields it does not know, so a GUI that finds a lower revision blocks saving profiles and offers to restart the Agent (stop it, then launch the one installed next to the GUI).
+
 `throughput` is the generation speed, sampled from the server's `GET /slots` once per second while its process runs: `{"available":true,"reason":"","tokensPerSecond":41.7,"lastTokensPerSecond":39.2,"generatedTokens":5120,"activeSlots":1,"slots":2}`. `tokensPerSecond` is the speed over the last second across all slots (prompt processing is not counted); `lastTokensPerSecond` is the average of the latest finished generation burst (0 until one finished); `generatedTokens` counts tokens since the process started. When `available` is false, `reason` says why (`Not running`, `Waiting for /slots`, or the endpoint is disabled because the server runs with `--no-slots`; then it is not polled again until the next start). The GUI keeps its own 5-minute history from the status updates.
 
 `state` is one of STOPPED, STARTING, RUNNING, UNHEALTHY, RESTARTING, BACKOFF, FAILED, STOPPING. Profiles can be edited or deleted only in STOPPED or FAILED.
@@ -73,7 +75,7 @@ A history point: `{"time":<ms since epoch>,"cpu":<percent>,"ramUsed":<bytes>,"ra
 
 Defaults: id/name/executable/model/workingDirectory are empty strings; host=127.0.0.1, port=8080, context=4096, gpuLayers=0, threads=4, parallel=1, metrics=false, autoStart=false, aliasEnabled=false, alias="", extraArguments=[], environment={}.
 
-`aliasEnabled` / `alias`: when enabled, the alias is passed as `--alias`, so `GET /v1/models` reports it as the model ID instead of the model file path. An enabled alias must not be empty, have leading or trailing spaces, or contain commas or control characters; `-a` and `--alias` cannot be set through extraArguments.
+`aliasEnabled` / `alias`: when enabled, the alias is passed as `--alias`, so `GET /v1/models` reports it as the model ID instead of the model file path. An enabled alias must not be empty, have leading or trailing spaces, or contain commas or control characters; `-a` and `--alias` cannot be set through extraArguments. A profile without `aliasEnabled` was saved before the option existed: an `--alias`/`-a` in its extraArguments is moved into the option (the first ID of a comma-separated list), and the Agent saves the migrated profiles once, keeping the previous file as `profiles.json.bak`. `updateProfile` without `aliasEnabled` (an older GUI) keeps the model's current alias.
 
 `autoStart`: when true, the Agent starts this model each time the Agent starts (after it begins listening). A failure, such as a port conflict, is added to the status `warning` and to the model's log; the Agent keeps running.
 
