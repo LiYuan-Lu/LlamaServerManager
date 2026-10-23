@@ -147,7 +147,7 @@ Item {
                     HoverHandler { id: restartsHover }
                 }
                 ServerControls {
-                    Layout.preferredWidth: 260
+                    fillToggle: false
                     profileId: page.profileId; info: page.info; startBlocked: editor.dirty
                 }
             }
