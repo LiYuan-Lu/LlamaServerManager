@@ -12,6 +12,8 @@
 #include <QTextStream>
 #include <QTimer>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 #include <vector>
 // Test double for llama-server. Environment switches:
 //   FAKE_HELP_HANG            --help never returns
@@ -27,6 +29,7 @@
 // GET /v1/models reports --alias (or the -m path) as the model ID; GET /props reports the
 // per-slot context (-c divided by --parallel).
 //   FAKE_GENERATE_TPS         GET /slots shows slot 0 generating this many tokens per second
+//   FAKE_DEMO_TPS             FAKE_DEMO_LOG's base generation speed (default 38-58 tokens per second)
 //   FAKE_NO_SLOTS             GET /slots returns 501, like llama-server --no-slots
 int main(int argc, char** argv)
 {
@@ -72,14 +75,32 @@ int main(int argc, char** argv)
                                      .toJson(QJsonDocument::Compact);
     const int generateTps = qEnvironmentVariableIntValue("FAKE_GENERATE_TPS");
     const bool noSlots = qEnvironmentVariableIsSet("FAKE_NO_SLOTS");
-    const auto slotsBody = [&started, generateTps, slotContext] {
-        const bool generating = generateTps > 0;
+    // FAKE_DEMO_LOG's simulated request on slot 0: n_decoded grows while it generates.
+    struct Demo {
+        bool generating = false;
+        int task = -1;
+        qint64 tokens = 0;
+        double speed = 0;
+        QElapsedTimer clock;
+        qint64 decoded() const { return generating ? std::min<qint64>(tokens, qint64(clock.elapsed() * speed / 1000)) : tokens; }
+    } demo;
+    const int slotCount = std::max(1, option("--parallel", "1").toInt());
+    const auto slotsBody = [&started, &demo, generateTps, slotContext, slotCount] {
         const auto slot = [slotContext](int id, bool processing, int task, qint64 decoded) {
             return QJsonObject { { "id", id }, { "n_ctx", slotContext }, { "speculative", false }, { "is_processing", processing }, { "id_task", task },
                 { "next_token", QJsonObject { { "has_next_token", processing }, { "has_new_line", false }, { "n_remain", -1 }, { "n_decoded", decoded } } } };
         };
-        return QJsonDocument(QJsonArray { slot(0, generating, generating ? 1 : -1, generating ? started.elapsed() * generateTps / 1000 : 0), slot(1, false, -1, 0) })
-            .toJson(QJsonDocument::Compact);
+        QJsonObject first = slot(0, false, -1, 0);
+        if (generateTps > 0) {
+            first = slot(0, true, 1, started.elapsed() * generateTps / 1000);
+        } else if (demo.task >= 0) {
+            first = slot(0, demo.generating, demo.task, demo.decoded());
+        }
+        QJsonArray slotList { first };
+        for (int id = 1; id < slotCount; ++id) {
+            slotList.append(slot(id, false, -1, 0));
+        }
+        return QJsonDocument(slotList).toJson(QJsonDocument::Compact);
     };
     QObject::connect(&listener, &QTcpServer::newConnection, &app, [&] {
         while (QTcpSocket* socket = listener.nextPendingConnection()) {
@@ -101,7 +122,10 @@ int main(int argc, char** argv)
                 } else if (request.startsWith("GET /props ")) {
                     body = propsBody;
                 } else if (request.startsWith("GET /slots ")) {
-                    if (noSlots) {
+                    if (elapsed < loadingMs) {
+                        status = "503 Service Unavailable";
+                        body = R"({"error":{"code":503,"message":"Loading model"}})";
+                    } else if (noSlots) {
                         status = "501 Not Implemented";
                         body = R"({"error":{"code":501,"message":"This server does not support slots endpoint."}})";
                     } else {
@@ -151,27 +175,47 @@ int main(int argc, char** argv)
                             << "main: server is listening on http://127.0.0.1:" << args.value(index + 1) << "\n"
                             << "srv  update_slots: all slots are idle\n"
                             << Qt::flush;
-        QObject::connect(&timer, &QTimer::timeout, &app, [&timer] {
-            static int task = 100;
-            const int tokens = 40 + int(QRandomGenerator::global()->bounded(400));
-            const double speed = 38.0 + QRandomGenerator::global()->bounded(20.0);
-            QTextStream(stderr) << "slot launch_slot_: id  0 | task " << task << " | processing task\n"
-                                << "slot      release: id  0 | task " << task << " | stop processing: n_past = " << tokens + 512 << ", truncated = 0\n"
-                                << "prompt eval time =     " << QString::number(180.0 + tokens * 0.4, 'f', 2) << " ms /   512 tokens\n"
-                                << "       eval time =    " << QString::number(tokens * 1000.0 / speed, 'f', 2) << " ms / " << tokens << " tokens ("
-                                << QString::number(speed, 'f', 2) << " tokens per second)\n"
+        // Alternates between a request that generates for a few seconds and a short idle gap.
+        const double baseSpeed = qEnvironmentVariableIsSet("FAKE_DEMO_TPS") ? qEnvironmentVariableIntValue("FAKE_DEMO_TPS") - 4.0 : 38.0;
+        const double speedRange = qEnvironmentVariableIsSet("FAKE_DEMO_TPS") ? 8.0 : 20.0;
+        timer.setSingleShot(true);
+        QObject::connect(&timer, &QTimer::timeout, &app, [&timer, &demo, baseSpeed, speedRange] {
+            auto* random = QRandomGenerator::global();
+            if (!demo.generating) {
+                demo.task = demo.task < 0 ? 100 : demo.task + 1;
+                demo.tokens = 120 + random->bounded(400);
+                demo.speed = baseSpeed + random->bounded(speedRange);
+                demo.generating = true;
+                demo.clock.start();
+                QTextStream(stderr) << "slot launch_slot_: id  0 | task " << demo.task << " | processing task\n"
+                                    << Qt::flush;
+                const int ms = int(demo.tokens * 1000 / demo.speed);
+                // Generating tokens costs CPU, so the per-model CPU column has something to show.
+                std::thread([ms] {
+                    QElapsedTimer busy;
+                    busy.start();
+                    volatile double sink = 0;
+                    while (busy.elapsed() < ms) {
+                        // About half of one core, like a GPU-offloaded model feeding the GPU.
+                        QElapsedTimer slice;
+                        slice.start();
+                        while (slice.elapsed() < 8) {
+                            sink = sink + 1.0;
+                        }
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    }
+                }).detach();
+                timer.start(ms);
+                return;
+            }
+            demo.generating = false;
+            QTextStream(stderr) << "slot      release: id  0 | task " << demo.task << " | stop processing: n_past = " << demo.tokens + 512 << ", truncated = 0\n"
+                                << "prompt eval time =     " << QString::number(180.0 + demo.tokens * 0.4, 'f', 2) << " ms /   512 tokens\n"
+                                << "       eval time =    " << QString::number(demo.tokens * 1000.0 / demo.speed, 'f', 2) << " ms / " << demo.tokens << " tokens ("
+                                << QString::number(demo.speed, 'f', 2) << " tokens per second)\n"
                                 << "srv  log_server_r: request: POST /v1/chat/completions 127.0.0.1 200\n"
                                 << Qt::flush;
-            ++task;
-            // Generating tokens costs CPU, so the per-model CPU column has something to show.
-            QElapsedTimer busy;
-            busy.start();
-            const int ms = 700 + int(QRandomGenerator::global()->bounded(1300));
-            volatile double sink = 0;
-            while (busy.elapsed() < ms) {
-                sink = sink + 1.0;
-            }
-            timer.start(2000 + int(QRandomGenerator::global()->bounded(5000)));
+            timer.start(1500 + random->bounded(3500));
         });
         timer.start(1500);
     } else {

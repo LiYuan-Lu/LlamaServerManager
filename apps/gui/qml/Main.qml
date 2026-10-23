@@ -51,6 +51,10 @@ ApplicationWindow {
     function openModel(id) {
         stack.push(modelPage, {profileId: id, suggestedPort: nextPort()})
     }
+    // Test hook (--smoke-test with LSM_SMOKE_ACTION): forwarded to the current page.
+    function smokeAction(action) {
+        if (stack.currentItem && stack.currentItem.smokeAction) stack.currentItem.smokeAction(action)
+    }
     // Replaces the current model page with an unsaved copy of `profile`.
     function duplicateModel(profile) {
         const copy = JSON.parse(JSON.stringify(profile))

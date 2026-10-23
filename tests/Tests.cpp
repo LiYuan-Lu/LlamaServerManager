@@ -431,6 +431,7 @@ private slots:
         QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
         ServerSupervisor supervisor("speed", dir.path() + "/history.json");
         auto p = profile(dir.path());
+        p.parallel = 2;
         p.environment = { { "FAKE_GENERATE_TPS", "200" } };
         QCOMPARE(supervisor.status()["throughput"].toObject()["available"].toBool(), false);
         QVERIFY(supervisor.start(p).isEmpty());

@@ -70,6 +70,12 @@ Item {
         return health
     }
 
+    // Test hook for screenshots: "speed" shows the Speed tab, "opencode" opens the config dialog.
+    function smokeAction(action) {
+        if (action === "speed") tabs.currentIndex = 2
+        else if (action === "opencode") opencodeDialog.request()
+    }
+
     Component.onCompleted: agent.selectedId = profileId
     onProfileIdChanged: agent.selectedId = profileId
     Connections {

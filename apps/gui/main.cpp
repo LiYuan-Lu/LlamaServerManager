@@ -200,10 +200,21 @@ int main(int argc, char** argv)
     }
     if (smokeTest) {
         // Test hooks: LSM_SCREENSHOT saves the window after LSM_SCREENSHOT_DELAY_MS (default 700);
-        // LSM_SMOKE_OPEN opens that model's detail page first ("duplicate:<id>" opens a copy).
+        // LSM_SMOKE_OPEN opens that model's detail page first ("duplicate:<id>" opens a copy);
+        // LSM_SMOKE_ACTION then runs smokeAction() on that page ("speed" tab, "opencode" dialog);
+        // LSM_SCREENSHOT_SIZE ("<width>x<height>") resizes the window first.
         const auto screenshot = qEnvironmentVariable("LSM_SCREENSHOT");
         const int delay = qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") > 0 ? qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") : 700;
         const auto open = qEnvironmentVariable("LSM_SMOKE_OPEN");
+        const auto action = qEnvironmentVariable("LSM_SMOKE_ACTION");
+        if (const auto size = qEnvironmentVariable("LSM_SCREENSHOT_SIZE").split('x'); size.size() == 2) {
+            window->resize(size[0].toInt(), size[1].toInt());
+        }
+        if (!action.isEmpty()) {
+            QTimer::singleShot(delay * 3 / 4, &app, [&engine, action] {
+                QMetaObject::invokeMethod(engine.rootObjects().first(), "smokeAction", Q_ARG(QVariant, action));
+            });
+        }
         if (!open.isEmpty()) {
             QTimer::singleShot(delay / 2, &app, [&engine, &client, open] {
                 auto* root = engine.rootObjects().first();

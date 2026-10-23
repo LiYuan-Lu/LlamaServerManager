@@ -196,3 +196,4 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 - 新增 `agentCompatibility`：舊版存下、額外參數含 `--alias` 的 profiles.json 會轉成別名選項（逗號分隔時取第一個），Agent 讀取後存檔一次並留下 `.bak`；新格式仍不允許在額外參數設定 `--alias`；狀態帶有 `revision`；舊版 GUI 存檔時不帶別名欄位，別名會被保留。
 - 新增 `clientRestartsOutdatedAgent`：連到沒有 `revision` 的舊 Agent 時 `agentOutdated` 為 true；「重新啟動 Agent」會停止舊 Agent，再啟動並連上這個版本的 Agent。
 - 用使用者實際的 profiles.json 驗證轉換：兩個模型都能載入，第一個模型的 `--alias bonsai-2-27b` 移到別名選項，其餘設定不變。
+- README 截圖（0.2.0）：假 llama-server 的 `FAKE_DEMO_LOG` 會模擬一段段請求，`/slots` 依生成進度回報 `n_decoded`（`FAKE_DEMO_TPS` 設定基準速度），讀取模型期間回 503，處理槽數量跟著 `--parallel`。GUI 的 `--smoke-test` 新增 `LSM_SMOKE_ACTION`（`speed` 切到速度分頁、`opencode` 開啟設定對話框）與 `LSM_SCREENSHOT_SIZE`（截圖前調整視窗大小）。
