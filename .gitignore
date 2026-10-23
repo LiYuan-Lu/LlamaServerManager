@@ -6,3 +6,4 @@ CMakeUserPresets.json
 /lsm-test-*/
 /test-output.txt
 /gui-preview.png
+/packaging/windows/out/

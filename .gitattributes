@@ -9,3 +9,4 @@
 *.dll binary
 *.qm binary
 *.gguf binary
+*.icns binary

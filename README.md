@@ -19,7 +19,8 @@ Point it at your own `llama-server.exe` and GGUF models, then start, stop, and m
 - **Watchdog** — HTTP health checks on `/health`, crash detection, and automatic restarts with exponential backoff and a restart limit, so a broken model does not restart forever. A manual Stop is always respected. Every failure is kept in a restart history.
 - **Live resource dashboard** — system CPU and RAM plus NVIDIA GPU utilization, VRAM, temperature, and power, each with a 5-minute chart. Every model card also shows that server's own CPU, RAM, and VRAM.
 - **Console** — live stdout/stderr per model with search, Error/Warning/Info filters, pause, copy, and export. Logs are also written to disk with size limits and rotation.
-- **Convenience** — start chosen models automatically with the Agent, duplicate a profile to try other settings, and stop everything with one Stop Agent button.
+- **Lives in the system tray** — closing the window keeps everything running in the tray, with a status dot, per-model Start/Stop/Restart, and a notification when a model fails. Optionally start at sign-in, with your chosen models loading automatically.
+- **Convenience** — duplicate a profile to try other settings, and stop all models and the Agent with one Stop Agent button.
 - **English and Traditional Chinese** user interface, switchable at any time.
 - **Nothing extra to install** — no Docker, Python, Ollama, or LM Studio. It uses the llama.cpp build and models you already have and never modifies them.
 
@@ -50,13 +51,13 @@ More detail: [architecture](docs/architecture.md) · [IPC protocol](docs/ipc-pro
 - Windows 10 or 11, x64
 - A `llama-server.exe` from [llama.cpp](https://github.com/ggml-org/llama.cpp) (any backend: CPU, CUDA, Vulkan, …) and one or more `.gguf` models
 - Optional: an NVIDIA GPU and driver for GPU/VRAM monitoring (NVML ships with the driver). Without it, everything except the GPU tiles works as usual.
-- To build: Qt 6.5+ (MSVC x64), CMake 3.24+, and Visual Studio 2022 or 2026 with the C++ desktop workload
+- To build: Qt 6.5+ (MSVC x64), CMake 3.24+, and Visual Studio 2022 or 2026 with the C++ desktop workload; Inno Setup 6 for the installer
 
-There are no prebuilt releases yet; [build from source](#building-from-source) as shown below.
+There are no prebuilt releases yet. [Build the installer](#build-the-installer) or [build from source](#building-from-source) as shown below.
 
 ## Getting started
 
-1. Run `llama-manager.exe`. It starts the Agent in the background.
+1. Run the installer, or `llama-manager.exe` from a build. It starts the Agent in the background.
 2. Click the **+** card, give the model a name, and use **Browse…** to select your `llama-server.exe` and `.gguf` file. Adjust the port, context size, GPU layers, and other options, then click **Add model**.
 3. Click **▶ Start** on the card. The Agent checks the executable's `--help` output, launches it, and keeps the model in `STARTING` until `GET /health` answers 200, then shows `RUNNING`.
 4. Point your client at `http://127.0.0.1:<port>` (llama-server's OpenAI-compatible API).
@@ -68,7 +69,9 @@ Click a card to open its page with the full profile, the **Console**, and the **
 | You want to… | Do this |
 | --- | --- |
 | Stop one model | Its **■ Stop** button. Pending automatic restarts are cancelled. |
-| Close the window, keep models running | Close the window. Reopen it any time. |
+| Close the window, keep models running | Close the window: it goes to the system tray. Click the tray icon to bring it back. |
+| Exit the window completely | Tray menu or **⋯** menu → **Exit (models keep running)**. |
+| Start everything when you sign in | **Start at sign-in** in the **⋯** menu or the tray menu, plus **Start automatically when the Agent starts** on the models you want. |
 | Stop all models and the Agent | **Stop Agent** (top right), then confirm. Start it again with **Start Agent**. |
 | Start a model whenever the Agent starts | Check **Start automatically when the Agent starts** in its profile. |
 | Try different settings | **Duplicate** on the model page creates an unsaved copy on the next free port. |
@@ -123,18 +126,21 @@ ctest --test-dir build -C Release --output-on-failure
 
 The tests need no GPU or model: they use a small fake `llama-server` and a fake NVML library. See [docs/testing.md](docs/testing.md) for what is covered, the recorded results, and how to run the optional test against a real model.
 
-### Create a runnable folder
+### Build the installer
 
-Keep both executables in the same folder and let `windeployqt` add the Qt runtime:
+With [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed (`winget install JRSoftware.InnoSetup`), one script builds a Release version, collects the Qt runtime, and produces `packaging\windows\out\LlamaServerManager-<version>-windows-x64-setup.exe`:
 
 ```powershell
-New-Item -ItemType Directory -Force deploy | Out-Null
-Copy-Item build\Release\llama-manager.exe, build\Release\llama-manager-agent.exe deploy
-& (Join-Path $qtRoot "bin\windeployqt.exe") --release --qmldir apps\gui\qml deploy\llama-manager.exe
-& (Join-Path $qtRoot "bin\windeployqt.exe") --release deploy\llama-manager-agent.exe
+.\packaging\windows\build-installer.ps1 -QtRoot $qtRoot
 ```
 
-The target computer needs the Microsoft Visual C++ x64 Redistributable. If `windeployqt` cannot find Visual Studio, run it from a *Developer PowerShell for VS* or add `--compiler-runtime` with `$env:VCINSTALLDIR` set.
+The installer adds Start menu (and optionally desktop) shortcuts, installs the Visual C++ runtime when needed, can turn on start at sign-in, and closes a running copy cleanly before upgrading or uninstalling. Your profiles and logs are kept on uninstall. See [packaging/README.md](packaging/README.md).
+
+To get just a runnable folder (any platform), install the build: Qt's deployment step copies the Qt libraries, plugins, and QML modules next to the executables.
+
+```powershell
+cmake --install build --config Release --prefix dist
+```
 
 ### Translations
 
@@ -156,6 +162,7 @@ core/           Profiles, process management, watchdog, health checks, resource 
 ipc/            JSON protocol, Agent server, GUI client, console model
 tests/          Qt Test suite, fake llama-server, fake NVML library
 translations/   Qt Linguist sources
+packaging/      Installers per platform (Windows: Inno Setup)
 docs/           Design and test documentation
 ```
 
@@ -166,18 +173,18 @@ docs/           Design and test documentation
 | [docs/ipc-protocol.md](docs/ipc-protocol.md) | GUI ⇄ Agent messages |
 | [docs/phase2.md](docs/phase2.md) | Watchdog and restart policy |
 | [docs/phase3.md](docs/phase3.md) | Resource monitoring and console |
+| [docs/phase4.md](docs/phase4.md) | System tray, start at sign-in, command line, packaging |
 | [docs/testing.md](docs/testing.md) | Test coverage and results |
 
 ## Roadmap
 
-Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), plus profile duplication, auto start, and Stop Agent.
+Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, and the first part of desktop integration (Phase 4): system tray, start at sign-in, and the Windows installer.
 
-Next, Windows integration (Phase 4):
+Next:
 
-- System tray icon with status and Start/Stop/Restart
-- Start the Agent at sign-in through Task Scheduler
-- Optional Windows Service for the Agent
-- Installer, uninstaller, and release packages
+- Optional Windows Service for the Agent, with permission management
+- macOS app bundle and DMG, Linux packages (the tray and start-at-sign-in code already has macOS and Linux backends)
+- Signed release builds
 
 ## Contributing
 

@@ -3,6 +3,7 @@
 #include "core/HealthMonitor.h"
 #include "core/LlamaProcessManager.h"
 #include "core/LogStore.h"
+#include "core/LoginStartup.h"
 #include "core/MetricsCollector.h"
 #include "core/ProfileStore.h"
 #include "core/RestartPolicy.h"
@@ -20,6 +21,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QXmlStreamReader>
 #include <QtTest>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -29,8 +31,12 @@ class Tests : public QObject {
     Q_OBJECT
     QString binary(const QString& name)
     {
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN)
         return QCoreApplication::applicationDirPath() + "/" + name + ".exe";
+#elif defined(Q_OS_MACOS)
+        // The GUI is an app bundle and the Agent is built into it (see CMakeLists.txt).
+        const QString bundled = QCoreApplication::applicationDirPath() + "/llama-manager.app/Contents/MacOS/" + name;
+        return QFileInfo::exists(bundled) ? bundled : QCoreApplication::applicationDirPath() + "/" + name;
 #else
         return QCoreApplication::applicationDirPath() + "/" + name;
 #endif
@@ -1028,6 +1034,151 @@ private slots:
         QVERIFY(agent.waitForFinished(20000));
         QCOMPARE(agent.exitCode(), 0);
         QTRY_VERIFY_WITH_TIMEOUT(!processAlive(autoPid), 5000);
+    }
+    void loginStartup()
+    {
+        LoginStartup::Entry entry;
+        entry.program = "C:/Program Files/Llama & Co/llama-manager.exe";
+        entry.arguments = { "--minimized", "--data-dir", "C:/Data Dir/x" };
+        // Windows: a well-formed task for this user only, no time limit, normal priority.
+        auto task = QString::fromUtf8(LoginStartup::windowsTaskXml(entry, "PC\\alice"));
+        const QString declaration = "<?xml version=\"1.0\" encoding=\"UTF-16\"?>";
+        QVERIFY(task.startsWith(declaration));
+        QXmlStreamReader reader(QString(task).replace("UTF-16", "UTF-8").toUtf8());
+        QStringList commands, arguments, users;
+        while (!reader.atEnd()) {
+            reader.readNext();
+            if (reader.isStartElement() && reader.name() == QLatin1String("Command")) {
+                commands << reader.readElementText();
+            } else if (reader.isStartElement() && reader.name() == QLatin1String("Arguments")) {
+                arguments << reader.readElementText();
+            } else if (reader.isStartElement() && reader.name() == QLatin1String("UserId")) {
+                users << reader.readElementText();
+            }
+        }
+        QVERIFY2(!reader.hasError(), qPrintable(reader.errorString()));
+        QCOMPARE(commands, QStringList { QDir::toNativeSeparators(entry.program) });
+        const QString expectedArguments = "--minimized --data-dir \"C:/Data Dir/x\"";
+        QCOMPARE(arguments, QStringList { expectedArguments });
+        QCOMPARE(users, (QStringList { "PC\\alice", "PC\\alice" })); // trigger and principal
+        QVERIFY(task.contains("<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>"));
+        QVERIFY(task.contains("<Priority>4</Priority>"));
+        QVERIFY(LoginStartup::windowsTaskName("alice").endsWith("alice"));
+
+        // Linux: Desktop Entry quoting.
+        QCOMPARE(LoginStartup::desktopExecQuote("/usr/bin/llama-manager"), QString("/usr/bin/llama-manager"));
+        const QString spaced = "\"/opt/My App/run\"", percent = "\"50%%\"";
+        const QString special = "a\"b$c\\", specialQuoted = "\"a\\\"b\\$c\\\\\"";
+        QCOMPARE(LoginStartup::desktopExecQuote("/opt/My App/run"), spaced);
+        QCOMPARE(LoginStartup::desktopExecQuote("50%"), percent);
+        QCOMPARE(LoginStartup::desktopExecQuote(special), specialQuoted);
+
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        for (const auto format : { LoginStartup::FileFormat::DesktopEntry, LoginStartup::FileFormat::LaunchAgent }) {
+            const auto folder = dir.filePath(format == LoginStartup::FileFormat::DesktopEntry ? "autostart" : "LaunchAgents");
+            LoginStartup::Entry desired { dir.filePath("My App/llama-manager"), { "--minimized", "--data-dir", dir.filePath("data & more") }, { } };
+            LoginStartup startup(desired, LoginStartup::fileBackend(format, folder));
+            QVERIFY(startup.supported());
+            startup.refresh();
+            QTRY_VERIFY(!startup.busy());
+            QVERIFY(!startup.enabled());
+            startup.setEnabled(true);
+            QTRY_VERIFY(!startup.busy());
+            QVERIFY2(startup.enabled(), qPrintable(startup.error()));
+            const auto files = QDir(folder).entryList(QDir::Files);
+            QCOMPARE(files.size(), 1);
+            QFile file(QDir(folder).filePath(files.first()));
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            const auto written = file.readAll();
+            file.close();
+            if (format == LoginStartup::FileFormat::LaunchAgent) {
+                QVERIFY(written.contains("<key>RunAtLoad</key>"));
+                QVERIFY(written.contains("data &amp; more"));
+            } else {
+                QVERIFY(written.contains("Exec=\"" + dir.filePath("My App/llama-manager").toUtf8() + "\" --minimized"));
+            }
+            // A fresh instance reads it back as enabled and unchanged.
+            LoginStartup again(desired, LoginStartup::fileBackend(format, folder));
+            again.refresh();
+            QTRY_VERIFY(!again.busy());
+            QVERIFY(again.enabled());
+            QCOMPARE(QFileInfo(file).lastModified(), QFileInfo(file).lastModified());
+            // The app moved: refreshing points the entry at the new location.
+            auto moved = desired;
+            moved.program = dir.filePath("Elsewhere/llama-manager");
+            LoginStartup repaired(moved, LoginStartup::fileBackend(format, folder));
+            repaired.refresh();
+            QTRY_VERIFY(!repaired.busy());
+            QVERIFY(repaired.enabled());
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            QVERIFY(file.readAll().contains("Elsewhere"));
+            file.close();
+            // Turning it off removes the file; turning it off again is fine.
+            QCOMPARE(repaired.applyBlocking(false), QString());
+            QVERIFY(!file.exists());
+            QCOMPARE(repaired.applyBlocking(false), QString());
+            QVERIFY(!repaired.enabled());
+        }
+        // Disabled in the desktop's own startup settings counts as off.
+        QDir().mkpath(dir.filePath("hidden"));
+        QFile hidden(dir.filePath("hidden/llama-server-manager.desktop"));
+        QVERIFY(hidden.open(QIODevice::WriteOnly));
+        hidden.write("[Desktop Entry]\nExec=/x --minimized\nHidden=true\n");
+        hidden.close();
+        LoginStartup off({ "/x", { "--minimized" }, { } }, LoginStartup::fileBackend(LoginStartup::FileFormat::DesktopEntry, dir.filePath("hidden")));
+        off.refresh();
+        QTRY_VERIFY(!off.busy());
+        QVERIFY(!off.enabled());
+    }
+    void guiSingleInstanceAndQuit()
+    {
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        QProcess agent;
+        struct Cleanup {
+            QProcess& p;
+            ~Cleanup()
+            {
+                p.kill();
+                p.waitForFinished(5000);
+            }
+        } cleanup { agent };
+        QLocalSocket socket;
+        QVERIFY(launchAgent(agent, socket, dir.path()));
+        auto p = profile(dir.path());
+        const auto id = rpc(socket, "createProfile", { { "profile", p.toJson() } })["data"].toObject()["id"].toString();
+        QVERIFY(rpc(socket, "startServer", { { "profileId", id } })["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id)["state"].toString(), "RUNNING", 10000);
+        const auto modelPid = instance(socket, id)["pid"].toInteger();
+        // The first GUI keeps running (smoke test with a long delay).
+        QProcess first;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("LSM_SCREENSHOT_DELAY_MS", "20000");
+        first.setProcessEnvironment(environment);
+        first.start(binary("llama-manager"), { "--data-dir", dir.path(), "--smoke-test" });
+        QVERIFY(first.waitForStarted());
+        QTest::qWait(1500);
+        // A second launch hands over to the first and exits right away.
+        QProcess second;
+        second.start(binary("llama-manager"), { "--data-dir", dir.path() });
+        QVERIFY(second.waitForFinished(8000));
+        QCOMPARE(second.exitCode(), 0);
+        QCOMPARE(first.state(), QProcess::Running);
+        // --quit closes the GUI and stops the Agent and its models.
+        QProcess quit;
+        quit.start(binary("llama-manager"), { "--data-dir", dir.path(), "--quit" });
+        QVERIFY(quit.waitForFinished(40000));
+        QVERIFY2(quit.exitCode() == 0, quit.readAllStandardError().constData());
+        QVERIFY(first.waitForFinished(5000));
+        QCOMPARE(first.exitCode(), 0);
+        QVERIFY(agent.waitForFinished(5000));
+        QCOMPARE(agent.exitCode(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!processAlive(modelPid), 5000);
+        // With nothing running, --quit is a harmless no-op.
+        quit.start(binary("llama-manager"), { "--data-dir", dir.path(), "--quit" });
+        QVERIFY(quit.waitForFinished(15000));
+        QCOMPARE(quit.exitCode(), 0);
     }
     void agentAndGuiReconnect()
     {

@@ -130,12 +130,12 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="73"/>
+        <location filename="../apps/gui/qml/Main.qml" line="86"/>
         <source>● Agent connected</source>
         <translation>● Agent 已連線</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="73"/>
+        <location filename="../apps/gui/qml/Main.qml" line="86"/>
         <source>● Agent reconnecting</source>
         <translation>● Agent 重新連線中</translation>
     </message>
@@ -145,70 +145,90 @@
         <translation>Llama Server Manager</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="45"/>
+        <location filename="../apps/gui/qml/Main.qml" line="58"/>
         <source>%1 (copy)</source>
         <translation>%1（複本）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="54"/>
-        <location filename="../apps/gui/qml/Main.qml" line="78"/>
+        <location filename="../apps/gui/qml/Main.qml" line="67"/>
+        <location filename="../apps/gui/qml/Main.qml" line="91"/>
         <source>Stop Agent</source>
         <translation>停止 Agent</translation>
     </message>
     <message numerus="yes">
-        <location filename="../apps/gui/qml/Main.qml" line="61"/>
+        <location filename="../apps/gui/qml/Main.qml" line="74"/>
         <source>Stop the Agent? %n running model(s) will be stopped first, without automatic restarts.</source>
         <translation>
             <numerusform>要停止 Agent 嗎？會先停止 %n 個執行中的模型，且不會自動重啟。</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="62"/>
+        <location filename="../apps/gui/qml/Main.qml" line="75"/>
         <source>Stop the Agent? No models are running.</source>
         <translation>要停止 Agent 嗎？目前沒有執行中的模型。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="63"/>
+        <location filename="../apps/gui/qml/Main.qml" line="76"/>
         <source>The window stays open, and you can start the Agent again from here. To only stop one model, use its Stop button; to only close this window, close it — the Agent keeps running.</source>
         <translation>視窗會保持開啟，之後可以從這裡再次啟動 Agent。若只想停止某個模型，請用該模型的「停止」按鈕；若只想關閉視窗，直接關閉即可，Agent 會繼續執行。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="73"/>
+        <location filename="../apps/gui/qml/Main.qml" line="86"/>
         <source>● Agent stopped</source>
         <translation>● Agent 已停止</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="78"/>
+        <location filename="../apps/gui/qml/Main.qml" line="91"/>
         <source>Start Agent</source>
         <translation>啟動 Agent</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="83"/>
+        <location filename="../apps/gui/qml/Main.qml" line="96"/>
         <source>Stops all models and the background Agent</source>
         <translation>停止所有模型與背景 Agent</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="83"/>
+        <location filename="../apps/gui/qml/Main.qml" line="96"/>
         <source>Starts the background Agent; models with auto start begin loading</source>
         <translation>啟動背景 Agent；設定為自動啟動的模型會開始載入</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="99"/>
+        <location filename="../apps/gui/qml/Main.qml" line="105"/>
+        <source>More options</source>
+        <translation>更多選項</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/Main.qml" line="111"/>
+        <source>Start at sign-in</source>
+        <translation>登入時啟動</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/Main.qml" line="119"/>
+        <source>Open logs folder</source>
+        <translation>開啟日誌資料夾</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/Main.qml" line="122"/>
+        <source>Exit (models keep running)</source>
+        <translation>結束（模型繼續執行）</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/Main.qml" line="142"/>
         <source>%1 of %2 models running</source>
         <translation>%1 / %2 個模型執行中</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="100"/>
+        <location filename="../apps/gui/qml/Main.qml" line="143"/>
         <source>%1 of %2 models running · The Agent and models keep running after the window is closed</source>
         <translation>%1 / %2 個模型執行中 · 關閉視窗後，Agent 與模型仍會持續執行</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="108"/>
+        <location filename="../apps/gui/qml/Main.qml" line="152"/>
         <source>The Agent is stopped, so no models are running. Click Start Agent to manage models again.</source>
         <translation>Agent 已停止，因此沒有模型在執行。按「啟動 Agent」即可再次管理模型。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="144"/>
+        <location filename="../apps/gui/qml/Main.qml" line="188"/>
         <source>No models yet. Click + to add your first model.</source>
         <translation>尚未新增任何模型。點選 + 新增第一個模型。</translation>
     </message>
@@ -808,6 +828,101 @@
         <location filename="../apps/gui/qml/ServerControls.qml" line="30"/>
         <source>⟳ Restart</source>
         <translation>⟳ 重新啟動</translation>
+    </message>
+</context>
+<context>
+    <name>TrayIcon</name>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="108"/>
+        <source>The model stopped: %1</source>
+        <translation>模型已停止：%1</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="116"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="152"/>
+        <source>Agent stopped</source>
+        <translation>Agent 已停止</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="116"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="152"/>
+        <source>Connecting to the Agent…</source>
+        <translation>正在連線到 Agent…</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="119"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="153"/>
+        <source>%1 of %2 models running</source>
+        <translation>%1 / %2 個模型執行中</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../apps/gui/TrayIcon.cpp" line="122"/>
+        <source>%n model(s) failed</source>
+        <translation>
+            <numerusform>%n 個模型失敗</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="140"/>
+        <source>Hide window</source>
+        <translation>隱藏視窗</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="142"/>
+        <source>Show window</source>
+        <translation>顯示視窗</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="163"/>
+        <source>Start</source>
+        <translation>啟動</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="163"/>
+        <source>Stop</source>
+        <translation>停止</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="166"/>
+        <source>Restart</source>
+        <translation>重新啟動</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../apps/gui/TrayIcon.cpp" line="171"/>
+        <source>%n more in the window…</source>
+        <translation>
+            <numerusform>還有 %n 個，請在視窗中查看…</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="176"/>
+        <source>Open logs folder</source>
+        <translation>開啟日誌資料夾</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="178"/>
+        <source>Start at sign-in</source>
+        <translation>登入時啟動</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="185"/>
+        <source>Stop Agent…</source>
+        <translation>停止 Agent…</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="191"/>
+        <source>Start Agent</source>
+        <translation>啟動 Agent</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="194"/>
+        <source>Exit (models keep running)</source>
+        <translation>結束（模型繼續執行）</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/TrayIcon.cpp" line="210"/>
+        <source>Still running here. The Agent and your models keep running; use this icon to open the window or exit.</source>
+        <translation>程式仍在這裡執行。Agent 與模型會繼續運作；可用這個圖示開啟視窗或結束。</translation>
     </message>
 </context>
 <context>

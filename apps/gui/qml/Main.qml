@@ -4,7 +4,7 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: root
-    visible: true
+    visible: !startHidden
     width: 1120; height: 850
     minimumWidth: 840; minimumHeight: 650
     title: qsTr("Llama Server Manager")
@@ -16,6 +16,19 @@ ApplicationWindow {
     palette.button: "#334155"
     palette.buttonText: "#f8fafc"
     palette.highlight: "#2563eb"
+
+    // With a tray icon, closing the window only hides it; the tray menu exits the GUI.
+    onClosing: close => {
+        if (tray.available) {
+            close.accepted = false
+            root.hide()
+            tray.windowHidden()
+        }
+    }
+    Connections {
+        target: tray
+        function onStopAgentRequested() { confirmStopAgent.open() }
+    }
 
     readonly property int runningCount: {
         let n = 0
@@ -84,6 +97,36 @@ ApplicationWindow {
                 onClicked: agent.connected ? confirmStopAgent.open() : agent.launchAgent()
             }
             Button {
+                id: optionsButton
+                text: "⋯"
+                flat: true
+                Layout.preferredHeight: 34
+                implicitWidth: 40
+                ToolTip.visible: hovered; ToolTip.text: qsTr("More options")
+                onClicked: optionsMenu.open()
+                Menu {
+                    id: optionsMenu
+                    y: optionsButton.height
+                    MenuItem {
+                        text: qsTr("Start at sign-in")
+                        checkable: true
+                        checked: startup.enabled
+                        visible: startup.supported
+                        height: visible ? implicitHeight : 0
+                        enabled: !startup.busy
+                        onTriggered: startup.setEnabled(checked)
+                    }
+                    MenuItem { text: qsTr("Open logs folder"); onTriggered: tray.openLogsFolder() }
+                    MenuSeparator { visible: tray.available; height: visible ? implicitHeight : 0 }
+                    MenuItem {
+                        text: qsTr("Exit (models keep running)")
+                        visible: tray.available
+                        height: visible ? implicitHeight : 0
+                        onTriggered: Qt.quit()
+                    }
+                }
+            }
+            Button {
                 id: langButton
                 // Language names are shown in their own language and are not translated.
                 text: languageManager.language === "zh_TW" ? "EN" : "中文"
@@ -103,6 +146,7 @@ ApplicationWindow {
         }
         Label { text: agent.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Label { text: agent.warning || ""; visible: text.length > 0; color: "#fbbf24"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { text: startup.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
         Label {
             visible: agent.agentStopped && !agent.connected
             text: qsTr("The Agent is stopped, so no models are running. Click Start Agent to manage models again.")

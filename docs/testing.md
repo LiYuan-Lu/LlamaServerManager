@@ -144,3 +144,19 @@ Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1�
 
 尚未驗證：Windows 上停止 Agent 時，llama-server 不回應 terminate 會在 3 秒後被強制結束，因此整個關閉會多花約 3 秒；「Start Agent」按鈕與原本的自動啟動共用同一段程式，但沒有自動化 GUI 點擊測試。
 
+# Phase 4（第一部分）測試紀錄：系統匣、登入時啟動、安裝程式
+
+測試環境同上（Ubuntu 24.04、Qt 6.4.2）。**尚未在 Windows 或 macOS 上執行；Inno Setup 安裝程式與 PowerShell 建置腳本也尚未執行。**
+
+## 已執行
+
+- 全部 targets 編譯成功（`-Wall -Wextra` 無警告）；20 項中 20 項通過（`guiDetachedAgent` 在非 Windows 平台自動略過）。
+- 新增 `loginStartup`：Windows 工作排程 XML（格式正確、只限目前使用者、沒有執行時間上限、一般優先順序、含空白與 `&` 的路徑及參數）；Linux `.desktop` 的 Exec 引號規則；Linux 與 macOS 後端實際寫檔、讀回、程式搬移後自動修正路徑、關閉後移除檔案、桌面環境停用時視為關閉。
+- 新增 `guiSingleInstanceAndQuit`：第二次啟動 GUI 會交給第一個並立即結束（exit 0）；`--quit` 會關閉 GUI、讓 Agent 停止所有模型後以 exit 0 結束、模型程序確實結束；沒有東西在執行時 `--quit` 也正常結束。
+- 在 Xvfb + openbox + stalonetray 的真實 X11 桌面上手動檢查系統匣：圖示與綠色狀態點、選單（顯示/隱藏視窗、狀態、每個模型的子選單、開啟日誌資料夾、登入時啟動、停止 Agent、結束）、按關閉鈕後視窗隱藏但 GUI 繼續執行、左鍵切換視窗、第二次啟動叫回視窗、`--quit` 結束；勾選「隨 Agent 啟動」的模型會自動啟動。
+- `cmake --install` 安裝規則（Linux）：執行檔與授權檔安裝正確。Qt 部署腳本需要 Qt 6.5，本機 Qt 6.4 會略過。
+
+## 尚未驗證
+
+- Windows：`schtasks.exe` 建立／查詢／刪除工作（含一般使用者權限）、登入後實際啟動、通知區域圖示與選單、`--quit` 搭配安裝程式、Inno Setup 編譯與安裝／升級／移除流程、Visual C++ 執行階段安裝、`.rc` 圖示與版本資訊、`cmake --install` 的 windeployqt 部署。
+- macOS：app bundle、選單列單色圖示、LaunchAgent 登入啟動（目前只測試了 plist 的內容與讀寫）。

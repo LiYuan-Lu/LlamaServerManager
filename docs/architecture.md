@@ -12,6 +12,8 @@ The GUI opens on a grid of model cards. Each card shows the state, model file, a
 
 Models whose profile has `autoStart` are started right after the Agent begins listening. **Stop Agent** (`shutdownAgent`) stops every model like a manual Stop, waits until they have stopped, and exits with code 0, which releases the lock; a GUI that sees the `shutdown` event stops auto-launching the Agent until the user clicks Start Agent.
 
+Only one GUI runs per data directory (`gui.lock` plus a local socket); a second launch shows the existing window. With a system tray, closing the window hides it and the GUI keeps running in the tray; see phase4.md.
+
 The GUI never owns the llama-server QProcess. The Agent is launched with startDetached, so its lifetime is independent of the GUI socket and GUI shutdown. While the Agent is alive, it owns the model PID, state, launch arguments, and recent logs. Reconnecting the GUI does not restart the model. Stale PIDs on disk are not treated as live processes, and unknown processes are not adopted.
 
 ## States
