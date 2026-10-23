@@ -164,6 +164,8 @@ ApplicationWindow {
         id: gridPage
         ScrollView {
             id: scroll
+            // Keep the cards clear of the scroll bar.
+            rightPadding: ScrollBar.vertical.width + 8
             contentWidth: availableWidth
             contentHeight: content.height
             Column {

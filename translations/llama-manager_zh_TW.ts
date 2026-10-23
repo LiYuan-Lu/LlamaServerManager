@@ -437,6 +437,66 @@
         <source>Waiting for /health</source>
         <translation>等待 /health 回應</translation>
     </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
+        <source>Add model</source>
+        <translation>新增模型</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
+        <source>Save profile</source>
+        <translation>儲存設定</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="174"/>
+        <source>Revert changes</source>
+        <translation>還原編輯</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="176"/>
+        <source>Fill in the paths, then add the model to the list</source>
+        <translation>填好路徑後，將模型加入清單</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="177"/>
+        <source>Unsaved changes; save before starting</source>
+        <translation>尚未儲存；儲存後才能啟動</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="177"/>
+        <source>Starts with the saved profile</source>
+        <translation>使用已儲存的設定啟動</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="74"/>
+        <source>Unsaved changes</source>
+        <translation>尚未儲存的變更</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="79"/>
+        <source>This model has unsaved changes. Save them before leaving?</source>
+        <translation>這個模型有尚未儲存的變更，離開前要先儲存嗎？</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="83"/>
+        <source>Add and leave</source>
+        <translation>新增後離開</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="83"/>
+        <source>Save and leave</source>
+        <translation>儲存後離開</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="89"/>
+        <source>Discard changes</source>
+        <translation>捨棄變更</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="94"/>
+        <source>Keep editing</source>
+        <translation>繼續編輯</translation>
+    </message>
 </context>
 <context>
     <name>ProfileEditor</name>
@@ -513,26 +573,6 @@
         <translation>Agent 啟動時自動啟動此模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="149"/>
-        <source>Save profile</source>
-        <translation>儲存設定</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="150"/>
-        <source>Revert changes</source>
-        <translation>還原編輯</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="153"/>
-        <source>Unsaved changes; save before starting</source>
-        <translation>尚未儲存；儲存後才能啟動</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="153"/>
-        <source>Starts with the saved profile</source>
-        <translation>使用已儲存的設定啟動</translation>
-    </message>
-    <message>
         <location filename="../apps/gui/qml/ProfileEditor.qml" line="44"/>
         <source>Enter a name for this model</source>
         <translation>請輸入模型名稱</translation>
@@ -546,16 +586,6 @@
         <location filename="../apps/gui/qml/ProfileEditor.qml" line="74"/>
         <source>Shown on the model card</source>
         <translation>顯示在模型卡片上</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="149"/>
-        <source>Add model</source>
-        <translation>新增模型</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="152"/>
-        <source>Fill in the paths, then add the model to the list</source>
-        <translation>填好路徑後，將模型加入清單</translation>
     </message>
     <message>
         <location filename="../apps/gui/qml/ProfileEditor.qml" line="117"/>

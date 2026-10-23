@@ -16,6 +16,30 @@ Item {
     readonly property bool idle: serverState === "STOPPED" || serverState === "FAILED"
     signal back()
     signal duplicate(var profile)
+    // Leaving with unsaved edits asks first: save, discard, or keep editing.
+    property var pendingLeave: null
+    property bool leaveAfterSave: false
+    function requestLeave(action) {
+        if (!editor.dirty) {
+            action()
+            return
+        }
+        pendingLeave = action
+        confirmLeave.open()
+    }
+    function saveAndLeave() {
+        leaveAfterSave = true
+        editor.save()
+        if (!editor.savePending) { // invalid input: stay, the error is shown above the editor
+            leaveAfterSave = false
+            pendingLeave = null
+        }
+    }
+    function finishLeave() {
+        const action = pendingLeave
+        pendingLeave = null
+        if (action) Qt.callLater(action)
+    }
     function healthText(health) {
         if (!health) return "—"
         if (health === "Healthy") return qsTr("Healthy")
@@ -33,6 +57,46 @@ Item {
         function onProfileCreated(id) { if (page.isNew) page.profileId = id }
         function onInstanceIdsChanged() { if (!page.isNew && agent.instanceIds.indexOf(page.profileId) < 0) page.back() }
     }
+    Connections {
+        target: editor
+        // savePending clears before the editor reloads the saved profile, so check afterwards.
+        function onSavePendingChanged() {
+            if (editor.savePending || !page.leaveAfterSave) return
+            page.leaveAfterSave = false
+            Qt.callLater(() => { if (!editor.dirty) page.finishLeave(); else page.pendingLeave = null })
+        }
+    }
+
+    Dialog {
+        id: confirmLeave
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Unsaved changes")
+        width: 460
+        Label {
+            width: confirmLeave.availableWidth
+            wrapMode: Text.Wrap
+            text: qsTr("This model has unsaved changes. Save them before leaving?")
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: page.isNew ? qsTr("Add and leave") : qsTr("Save and leave")
+                enabled: editor.editable && !editor.savePending
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                onClicked: { confirmLeave.close(); page.saveAndLeave() }
+            }
+            Button {
+                text: qsTr("Discard changes")
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                onClicked: { confirmLeave.close(); page.finishLeave() }
+            }
+            Button {
+                text: qsTr("Keep editing")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onRejected: page.pendingLeave = null
+    }
 
     Dialog {
         id: confirmDelete
@@ -48,7 +112,7 @@ Item {
         anchors.fill: parent; spacing: 12
         RowLayout {
             Layout.fillWidth: true; spacing: 12
-            Button { text: qsTr("← All models"); flat: true; onClicked: page.back() }
+            Button { text: qsTr("← All models"); flat: true; onClicked: page.requestLeave(() => page.back()) }
             Label {
                 text: page.isNew ? (page.template ? qsTr("New model (copy)") : qsTr("New model")) : (page.info.name || "")
                 font.pixelSize: 20; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true
@@ -59,7 +123,7 @@ Item {
                 text: qsTr("Duplicate")
                 enabled: page.info.profile !== undefined
                 ToolTip.visible: hovered; ToolTip.text: qsTr("Create a new model with a copy of these settings")
-                onClicked: page.duplicate(page.info.profile)
+                onClicked: page.requestLeave(() => page.duplicate(page.info.profile))
             }
             Button {
                 visible: !page.isNew
@@ -98,10 +162,31 @@ Item {
             text: page.info.error || ""; visible: !page.isNew && text.length > 0
             color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true
         }
+        // Always visible, above the scrolling editor, so Save cannot be missed.
+        RowLayout {
+            Layout.fillWidth: true; spacing: 8
+            Button {
+                text: page.isNew ? qsTr("Add model") : qsTr("Save profile")
+                highlighted: editor.dirty
+                enabled: editor.editable && !editor.savePending
+                onClicked: editor.save()
+            }
+            Button { text: qsTr("Revert changes"); visible: !page.isNew; enabled: editor.editable && editor.dirty; onClicked: editor.load() }
+            Label {
+                text: page.isNew ? qsTr("Fill in the paths, then add the model to the list")
+                    : editor.dirty ? qsTr("Unsaved changes; save before starting") : qsTr("Starts with the saved profile")
+                color: editor.dirty && !page.isNew ? "#fbbf24" : "#94a3b8"
+                elide: Text.ElideRight; Layout.fillWidth: true
+            }
+        }
+        Label { text: editor.validationError; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
         SplitView {
             orientation: Qt.Vertical; Layout.fillWidth: true; Layout.fillHeight: true
             ScrollView {
-                SplitView.preferredHeight: page.isNew ? 10000 : 300; SplitView.minimumHeight: 120
+                // The settings get most of the height; the console below can be dragged larger.
+                SplitView.preferredHeight: page.isNew ? 10000 : Math.max(300, page.height * 0.55); SplitView.minimumHeight: 120
+                // Keep the Browse buttons and fields clear of the scroll bar.
+                rightPadding: ScrollBar.vertical.width + 8
                 contentWidth: availableWidth
                 ProfileEditor {
                     id: editor; width: parent.width

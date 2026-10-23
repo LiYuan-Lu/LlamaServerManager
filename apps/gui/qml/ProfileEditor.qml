@@ -145,14 +145,5 @@ ColumnLayout {
             }
         }
     }
-    RowLayout {
-        Button { text: editor.profileId === "" ? qsTr("Add model") : qsTr("Save profile"); enabled: editor.editable && !editor.savePending; onClicked: editor.save() }
-        Button { text: qsTr("Revert changes"); visible: editor.profileId !== ""; enabled: editor.editable; onClicked: editor.load() }
-        Label {
-            text: editor.profileId === "" ? qsTr("Fill in the paths, then add the model to the list")
-                : editor.dirty ? qsTr("Unsaved changes; save before starting") : qsTr("Starts with the saved profile")
-            color: "#94a3b8"
-        }
-    }
-    Label { text: editor.validationError; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+    // The Save/Revert bar and validation errors are shown by ModelPage, outside the scroll area.
 }
