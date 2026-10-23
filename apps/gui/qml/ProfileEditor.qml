@@ -22,9 +22,9 @@ ColumnLayout {
     function save() {
         try {
             const args = JSON.parse(extra.text), variables = JSON.parse(env.text)
-            if (!Array.isArray(args) || typeof variables !== "object" || variables === null || Array.isArray(variables)) throw new Error("額外參數必須是 JSON 陣列，環境變數必須是 JSON 物件")
+            if (!Array.isArray(args) || typeof variables !== "object" || variables === null || Array.isArray(variables)) throw new Error(qsTr("Extra arguments must be a JSON array, and environment variables must be a JSON object"))
             const values = [port.text, context.text, gpu.text, threads.text, parallel.text].map(Number)
-            if (values.some(v => !Number.isInteger(v))) throw new Error("數值欄位必須為整數")
+            if (values.some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
             validationError = ""
             agent.saveProfile({executable: exe.text, model: model.text, workingDirectory: cwd.text,
                 host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],
@@ -33,20 +33,20 @@ ColumnLayout {
     }
     Connections { target: agent; function onProfileChanged() { editor.load() } }
     Component.onCompleted: load()
-    FileDialog { id: exeDialog; title: "選擇 llama-server.exe"; nameFilters: ["Executable (*.exe)"]; onAccepted: { exe.text = agent.localPath(selectedFile); editor.dirty = true } }
-    FileDialog { id: modelDialog; title: "選擇 GGUF 模型"; nameFilters: ["GGUF models (*.gguf)"]; onAccepted: { model.text = agent.localPath(selectedFile); editor.dirty = true } }
-    FolderDialog { id: cwdDialog; title: "選擇工作目錄"; onAccepted: { cwd.text = agent.localPath(selectedFolder); editor.dirty = true } }
+    FileDialog { id: exeDialog; title: qsTr("Select llama-server.exe"); nameFilters: ["Executable (*.exe)"]; onAccepted: { exe.text = agent.localPath(selectedFile); editor.dirty = true } }
+    FileDialog { id: modelDialog; title: qsTr("Select GGUF model"); nameFilters: ["GGUF models (*.gguf)"]; onAccepted: { model.text = agent.localPath(selectedFile); editor.dirty = true } }
+    FolderDialog { id: cwdDialog; title: qsTr("Select working directory"); onAccepted: { cwd.text = agent.localPath(selectedFolder); editor.dirty = true } }
     GridLayout {
         columns: 3; Layout.fillWidth: true; enabled: editor.editable
         Label { text: "llama-server.exe" }
-        TextField { id: exe; Layout.fillWidth: true; placeholderText: "選擇執行檔"; onTextEdited: editor.dirty = true }
-        Button { text: "瀏覽…"; onClicked: exeDialog.open() }
-        Label { text: "GGUF 模型" }
-        TextField { id: model; Layout.fillWidth: true; placeholderText: "選擇模型檔案"; onTextEdited: editor.dirty = true }
-        Button { text: "瀏覽…"; onClicked: modelDialog.open() }
-        Label { text: "工作目錄" }
-        TextField { id: cwd; Layout.fillWidth: true; placeholderText: "留空使用執行檔目錄"; onTextEdited: editor.dirty = true }
-        Button { text: "瀏覽…"; onClicked: cwdDialog.open() }
+        TextField { id: exe; Layout.fillWidth: true; placeholderText: qsTr("Select the executable"); onTextEdited: editor.dirty = true }
+        Button { text: qsTr("Browse…"); onClicked: exeDialog.open() }
+        Label { text: qsTr("GGUF model") }
+        TextField { id: model; Layout.fillWidth: true; placeholderText: qsTr("Select the model file"); onTextEdited: editor.dirty = true }
+        Button { text: qsTr("Browse…"); onClicked: modelDialog.open() }
+        Label { text: qsTr("Working directory") }
+        TextField { id: cwd; Layout.fillWidth: true; placeholderText: qsTr("Leave empty to use the executable directory"); onTextEdited: editor.dirty = true }
+        Button { text: qsTr("Browse…"); onClicked: cwdDialog.open() }
     }
     GridLayout {
         columns: 8; Layout.fillWidth: true; enabled: editor.editable
@@ -66,15 +66,15 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true; enabled: editor.editable
-        Label { text: "額外參數 (JSON)" }
+        Label { text: qsTr("Extra arguments (JSON)") }
         TextField { id: extra; Layout.fillWidth: true; placeholderText: '["--verbose"]'; onTextEdited: editor.dirty = true }
-        Label { text: "環境變數 (JSON)" }
+        Label { text: qsTr("Environment variables (JSON)") }
         TextField { id: env; Layout.fillWidth: true; placeholderText: '{"NAME":"value"}'; onTextEdited: editor.dirty = true }
     }
     RowLayout {
-        Button { text: "儲存設定"; enabled: editor.editable; onClicked: editor.save() }
-        Button { text: "還原編輯"; enabled: editor.editable; onClicked: editor.load() }
-        Label { text: editor.dirty ? "尚未儲存；儲存後才能啟動" : "使用已儲存的設定啟動"; color: "#94a3b8" }
+        Button { text: qsTr("Save profile"); enabled: editor.editable; onClicked: editor.save() }
+        Button { text: qsTr("Revert changes"); enabled: editor.editable; onClicked: editor.load() }
+        Label { text: editor.dirty ? qsTr("Unsaved changes; save before starting") : qsTr("Starts with the saved profile"); color: "#94a3b8" }
     }
     Label { text: editor.validationError; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
 }

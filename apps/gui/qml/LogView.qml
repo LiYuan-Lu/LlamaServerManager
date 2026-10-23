@@ -5,9 +5,9 @@ ColumnLayout {
     spacing: 6
     RowLayout {
         Label { text: "Console · stdout / stderr"; font.bold: true; Layout.fillWidth: true }
-        CheckBox { id: follow; text: "自動捲動"; checked: true }
-        Button { text: "複製全部"; onClicked: { consoleText.selectAll(); consoleText.copy(); consoleText.deselect() } }
-        Button { text: "清除畫面"; onClicked: agent.clearLogs() }
+        CheckBox { id: follow; text: qsTr("Auto-scroll"); checked: true }
+        Button { text: qsTr("Copy all"); onClicked: { consoleText.selectAll(); consoleText.copy(); consoleText.deselect() } }
+        Button { text: qsTr("Clear view"); onClicked: agent.clearLogs() }
     }
     ScrollView {
         id: scroll; Layout.fillWidth: true; Layout.fillHeight: true

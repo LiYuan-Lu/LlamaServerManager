@@ -1,5 +1,8 @@
 #include "ipc/AgentClient.h"
 #include "ipc/Protocol.h"
+
+#include "LanguageManager.h"
+
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -8,12 +11,16 @@
 #include <QQuickWindow>
 int main(int argc, char **argv) {
     QGuiApplication app(argc, argv); app.setApplicationName("LlamaServerManager");
+    LanguageManager languageManager;
     QCommandLineParser parser; parser.addHelpOption();
     parser.addOption({"data-dir", "Agent data directory", "directory"});
     parser.addOption({"smoke-test", "Exit after QML startup (test only)"}); parser.process(app);
     QQuickStyle::setStyle("Fusion");
     AgentClient client(parser.isSet("data-dir") ? parser.value("data-dir") : Protocol::dataDirectory());
-    QQmlApplicationEngine engine; engine.rootContext()->setContextProperty("agent", &client);
+    QQmlApplicationEngine engine;
+    languageManager.setEngine(&engine);
+    engine.rootContext()->setContextProperty("agent", &client);
+    engine.rootContext()->setContextProperty("languageManager", &languageManager);
     engine.load(QUrl("qrc:/apps/gui/qml/Main.qml"));
     if (engine.rootObjects().isEmpty()) return 1;
     client.connectAgent();

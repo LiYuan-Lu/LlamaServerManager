@@ -1,31 +1,31 @@
-# Phase 1 架構
+# Phase 1 architecture
 
-GUI (`QGuiApplication`) → AgentClient → per-user QLocalSocket → AgentServer (`QCoreApplication`) → LlamaProcessManager → QProcess → llama-server。
+GUI (`QGuiApplication`) → AgentClient → per-user QLocalSocket → AgentServer (`QCoreApplication`) → LlamaProcessManager → QProcess → llama-server.
 
-GUI 從不持有 llama-server QProcess。Agent 由 startDetached 啟動，生命週期不受 GUI socket 與 GUI 結束影響。Agent 活著時，模型 PID、狀態、執行參數和近期日誌由 Agent 持有；GUI 重連不會重新啟動模型。不將磁碟舊 PID 當作仍有效的程序，也不重新接管未知程序。
+The GUI never owns the llama-server QProcess. The Agent is launched with startDetached, so its lifetime is independent of the GUI socket and GUI shutdown. While the Agent is alive, it owns the model PID, state, launch arguments, and recent logs. Reconnecting the GUI does not restart the model. Stale PIDs on disk are not treated as live processes, and unknown processes are not adopted.
 
-## 狀態
+## States
 
-STOPPED / FAILED → STARTING（非同步 --help 預檢與 OS 啟動）→ RUNNING。
-STARTING / RUNNING → STOPPING → STOPPED。
-非使用者停止的退出或啟動失敗 → FAILED。RUNNING 代表 OS 程序存在，沒有 HTTP 健康語意。
+STOPPED / FAILED → STARTING (asynchronous --help preflight and OS process launch) → RUNNING.
+STARTING / RUNNING → STOPPING → STOPPED.
+Unexpected exits and launch failures → FAILED. RUNNING means the OS process exists; it carries no HTTP health guarantee.
 
-手動 restart 只在 RUNNING 接受，先停止再重新啟動；STOPPING 時禁止重複 start / restart。Stop 取消待進行的 restart。每次 --help 與程序建立都有 10 秒 timeout；Stop 在 3 秒後 kill。模型載入時間本身不設限，因此大型模型不會因載入慢而被終止。
+A manual restart of an active server is accepted only in RUNNING and stops the process before starting it again. In STOPPED or FAILED, restart acts as start. STARTING and STOPPING reject additional start/restart commands. Stop cancels a pending restart. Both --help and OS process creation have 10-second timeouts; Stop falls back to kill after three seconds. Model loading itself has no deadline, so a large model is not terminated merely for loading slowly.
 
-Profile 是純資料型別，ProfileStore 處理檔案；LlamaProcessManager 不依賴 QML 或 IPC。AgentServer 是命令協調層。測試可以直接建立 ProcessManager 或啟動完整 Agent。
+Profile is a data type; ProfileStore handles files. LlamaProcessManager does not depend on QML or IPC. AgentServer coordinates commands. Tests can instantiate the process manager directly or launch the complete Agent.
 
-## 程序擁有權
+## Process ownership
 
-每個資料目錄取得 QLockFile 後才 listen，同帳號 GUI 使用同一 endpoint。QLocalServer 使用 UserAccessOption；QLockFile 不依鎖檔年齡移除仍存活的鎖。
+Each data directory acquires a QLockFile before listening. GUIs using the same account and directory share an endpoint. QLocalServer uses UserAccessOption. QLockFile does not remove a live lock merely because of its age.
 
-Windows 上模型在 started 時加入帶 KILL_ON_JOB_CLOSE 的 Job Object；只影響這個 Agent 建立並加入的程序。Agent 異常退出時通常也會終止此 job 中模型，避免無法接管的孤兒。這不影響 GUI 關閉，因 GUI 不擁有 job。
+On Windows, the model is assigned to a Job Object with KILL_ON_JOB_CLOSE after the started signal. Only processes created and assigned by this Agent are affected. An Agent crash normally terminates the model in that job to avoid an orphan that cannot be adopted. Closing the GUI does not close the job because the GUI does not own it.
 
-限制：Qt started signal 到 job assignment 有短暫空窗，立即衍生的子程序不保證被納管；assignment 被外部 job 限制時會記錄警告並僅管理直接子程序。標準 llama-server 為直接單一程序；未宣稱能可靠管理任意 wrapper 的程序樹。若後續必須支援任意 wrapper，應以 suspended launch + job assignment + resume 進行 Windows 專用擴充。從不掃描或按名稱殺掉其他 llama-server。
+There is a short interval between process creation and job assignment. Descendants spawned immediately are not guaranteed to join the job. If assignment is blocked by an external job restriction, a warning is logged and only the direct child is managed. Standard llama-server runs as the direct process; reliable management of arbitrary wrapper process trees is not claimed. Supporting such wrappers would require a Windows-specific suspended launch, job assignment, and resume sequence. The Agent never scans for or terminates unrelated llama-server processes by name.
 
-## 容量與失敗
+## Bounds and failure handling
 
-JSON newline frame 上限 1 MiB，單一 socket 待送上限 2 MiB，超過則中斷慢客戶端，使模型繼續執行。最多 16 個 GUI 連線。每個 log chunk 最多 4096 bytes，UTF-8 streaming decoder 保留跨讀取字元。記憶體與磁碟均有限容量；磁碟寫入／輪替失敗推播警告，不停止模型。
+Newline-delimited JSON frames are limited to 1 MiB, and each socket's pending output is limited to 2 MiB. Slow clients exceeding the limit are disconnected while the model continues running. At most 16 GUI connections are accepted. Process output is split into chunks of at most 4,096 bytes; streaming UTF-8 decoders preserve characters split across reads. Memory and disk retention are bounded. Disk write or rotation failures generate warnings without stopping the model.
 
-設定先驗證再原子寫入；讀取壞檔不立即覆寫。GUI 非同步重連間隔 1.5 秒，啟動 Agent 嘗試最多每 10 秒一次。請求 15 秒後報 timeout，不自動重送可能改變狀態的命令，避免重複操作。Agent 每秒推播狀態。
+Profiles are validated before atomic writes. Reading a corrupt file does not immediately overwrite it. The GUI retries connection asynchronously every 1.5 seconds and attempts to launch the Agent at most once every 10 seconds. Requests time out after 15 seconds. Commands that can change state are not retried automatically. The Agent pushes status every second.
 
-Qt 主執行緒的事件式 QProcess/IPC 不使用 waitForStarted/waitForFinished；僅 Agent 結束時 destructor 有 bounded cleanup，測試亦可使用等待。磁碟操作為短小同步本機 JSON/log 寫入；此 MVP 未實作慢速網路磁碟的背景寫入佇列，正式資料目錄應置於本機磁碟。
+The Qt main-thread event-driven QProcess/IPC paths do not use waitForStarted or waitForFinished. Bounded blocking cleanup is used only during Agent destruction; tests may also wait. Disk operations are short synchronous local JSON/log writes. This MVP does not have a background write queue for slow network storage; keep the production data directory on a local disk.
