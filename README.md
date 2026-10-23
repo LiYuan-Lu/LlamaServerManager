@@ -20,6 +20,8 @@ Point it at your own `llama-server.exe` and GGUF models, then start, stop, and m
 - **Live resource dashboard** — system CPU and RAM plus NVIDIA GPU utilization, VRAM, temperature, and power, each with a 5-minute chart. Every model card also shows that server's own CPU, RAM, and VRAM.
 - **Console** — live stdout/stderr per model with search, Error/Warning/Info filters, pause, copy, and export. Logs are also written to disk with size limits and rotation.
 - **Lives in the system tray** — closing the window keeps everything running in the tray, with a status dot, per-model Start/Stop/Restart, and a notification when a model fails. Optionally start at sign-in, with your chosen models loading automatically.
+- **Generation speed** — tokens per second for each model, read from llama-server's `/slots` once per second, with a 5-minute chart on the model page.
+- **Ready for opencode** — give a model a stable `--alias` ID, then let the model page read `/v1/models` and `/props` and produce an `opencode.json` provider entry to copy.
 - **Convenience** — duplicate a profile to try other settings, and stop all models and the Agent with one Stop Agent button.
 - **English and Traditional Chinese** user interface, switchable at any time.
 - **Nothing extra to install** — no Docker, Python, Ollama, or LM Studio. It uses the llama.cpp build and models you already have and never modifies them.

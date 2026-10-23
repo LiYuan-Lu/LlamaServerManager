@@ -178,3 +178,18 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 ## 尚未驗證
 
 - macOS：app bundle、選單列單色圖示、LaunchAgent 登入啟動（目前只測試了 plist 的內容與讀寫）。
+
+# Alias、opencode 設定、生成速度測試紀錄
+
+測試環境同上（Ubuntu 24.04、Qt 6.4.2、offscreen）。**尚未在 Windows 上執行，也尚未連接真正的 llama-server。**
+
+- 全部 targets 編譯成功（`-Wall -Wextra` 無警告）；`ctest` 27 項全部通過（`guiDetachedAgent` 在非 Windows 平台自動略過），連續 2 輪。
+- 新增 `aliasOption`：`aliasEnabled` / `alias` 預設關閉、型別檢查與保存；啟用時不可為空、不可有前後空白、逗號或控制字元、最長 128 字；啟用時參數加上 `--alias`；額外參數不可設定 `-a` / `--alias`。
+- 新增 `opencodeConfigBuild`：沒有模型 ID 時回報錯誤；provider 與模型名稱等於模型頁名稱；`0.0.0.0` 轉為 `127.0.0.1`；有 `/props` 時用它的 context，沒有時用 `-c` 除以 `--parallel`；output 上限 8192；多個 ID 時名稱加上 ID；`--api-key` 會帶入 `apiKey`。
+- 新增 `opencodeConfigFetch`：對假 llama-server 實際讀取 `/v1/models`（回報 alias）與 `/props`；伺服器停止後回報錯誤、不產生設定。
+- 新增 `throughputMeter`：以 `n_decoded` 的增加量計算每秒 token 數；第一筆只當基準；新任務在讀完提示前仍保留上一個任務的數字，不會被算成新輸出；生成結束後記錄該段的平均速度；支援舊版 `/slots` 格式（`next_token` 為陣列、`state` 為數字）。
+- 新增 `throughputMonitor`：假伺服器以每秒 200 token 生成時，量到的速度在 100 到 300 之間、忙碌處理槽 1/2；停止後標記為無法取得；`--no-slots`（HTTP 501）回報已停用。
+- 新增 `clientThroughputAndOpencode`：透過真的 Agent，GUI 用戶端累積速度歷史，並產生 alias 對應的 opencode 設定。
+- GUI 截圖檢查：編輯頁的 Alias 勾選框（名稱連動、自訂後不再連動、清空時的警告與無法存檔）；模型頁的「opencode config」按鈕與對話框；資訊列的速度與「速度」分頁的圖表。
+
+尚未驗證：真正的 llama-server `/slots` 在長時間生成、多個處理槽同時生成、推測解碼（`n_decoded` 一次增加多個）時的數字；opencode 實際讀取產生的設定。
