@@ -206,6 +206,8 @@ Item {
                 visible: !page.isNew
                 text: qsTr("opencode config")
                 enabled: page.serverState === "RUNNING"
+                // The dark palette draws disabled buttons like enabled ones, so fade it until the model runs.
+                opacity: enabled ? 1 : 0.45
                 ToolTip.visible: hovered; ToolTip.text: qsTr("Read the model ID from /v1/models and show a config for opencode")
                 onClicked: opencodeDialog.request()
             }
