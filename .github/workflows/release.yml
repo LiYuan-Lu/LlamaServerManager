@@ -42,6 +42,10 @@ jobs:
           version: ${{ env.QT_VERSION }}
           arch: win64_msvc2022_64
           cache: true
+          # Qt 6.11+ uses a new repository layout on Windows that the released aqtinstall
+          # (3.3.0) cannot read. Pin a master commit that has the fix (miurahr/aqtinstall#1000)
+          # until a release includes it, then switch back to aqtversion.
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7
 
       - name: Install Inno Setup
         shell: pwsh
