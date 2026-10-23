@@ -5,10 +5,13 @@
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QRandomGenerator>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTextStream>
 #include <QTimer>
+#include <algorithm>
+#include <vector>
 // Test double for llama-server. Environment switches:
 //   FAKE_HELP_HANG            --help never returns
 //   FAKE_EXIT                 exit with code 42 after 250 ms
@@ -17,6 +20,9 @@
 //   FAKE_ONCE_FILE            misbehave (FAKE_EXIT / FAKE_HEALTH_HANG_AFTER_MS) only on the run
 //                             that creates this file; later runs behave normally
 //   FAKE_LOG_LEVELS           print a few llama.cpp-like warning and error lines at start
+//   FAKE_DEMO_LOG             print a llama.cpp-like startup log and request lines instead of
+//                             the heartbeat (README screenshots)
+//   FAKE_RSS_MB               allocate and touch this many MiB so the process has a realistic size
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
@@ -88,10 +94,53 @@ int main(int argc, char** argv)
                             << "main: server is listening on http://127.0.0.1\n"
                             << Qt::flush;
     }
+    std::vector<char> resident(size_t(std::max(0, qEnvironmentVariableIntValue("FAKE_RSS_MB"))) * 1024 * 1024);
+    for (size_t i = 0; i < resident.size(); i += 4096) {
+        resident[i] = 1; // touch every page so it counts as resident memory
+    }
     QTimer timer;
-    QObject::connect(&timer, &QTimer::timeout, &app, [] { QTextStream(stdout) << "heartbeat 模型\n"
-                                                                              << Qt::flush; });
-    timer.start(100);
+    if (qEnvironmentVariableIsSet("FAKE_DEMO_LOG")) {
+        QTextStream(stderr) << "build: 6123 (a1b2c3d4) with MSVC 19.51 for x64\n"
+                            << "system info: n_threads = 8, n_threads_batch = 8, total_threads = 16\n"
+                            << "llama_model_loader: loaded meta data with 32 key-value pairs and 399 tensors\n"
+                            << "print_info: file type   = Q4_K - Medium\n"
+                            << "load_tensors: offloading 36 repeating layers to GPU\n"
+                            << "load_tensors: offloaded 37/37 layers to GPU\n"
+                            << "llama_context: n_ctx_per_seq (8192) < n_ctx_train (40960) -- the full capacity of the model will not be utilized\n"
+                            << "warning: --metrics is enabled, the /metrics endpoint is not protected by an API key\n"
+                            << "srv    load_model: loading model\n"
+                            << "main: model loaded\n"
+                            << "main: server is listening on http://127.0.0.1:" << args.value(index + 1) << "\n"
+                            << "srv  update_slots: all slots are idle\n"
+                            << Qt::flush;
+        QObject::connect(&timer, &QTimer::timeout, &app, [&timer] {
+            static int task = 100;
+            const int tokens = 40 + int(QRandomGenerator::global()->bounded(400));
+            const double speed = 38.0 + QRandomGenerator::global()->bounded(20.0);
+            QTextStream(stderr) << "slot launch_slot_: id  0 | task " << task << " | processing task\n"
+                                << "slot      release: id  0 | task " << task << " | stop processing: n_past = " << tokens + 512 << ", truncated = 0\n"
+                                << "prompt eval time =     " << QString::number(180.0 + tokens * 0.4, 'f', 2) << " ms /   512 tokens\n"
+                                << "       eval time =    " << QString::number(tokens * 1000.0 / speed, 'f', 2) << " ms / " << tokens << " tokens ("
+                                << QString::number(speed, 'f', 2) << " tokens per second)\n"
+                                << "srv  log_server_r: request: POST /v1/chat/completions 127.0.0.1 200\n"
+                                << Qt::flush;
+            ++task;
+            // Generating tokens costs CPU, so the per-model CPU column has something to show.
+            QElapsedTimer busy;
+            busy.start();
+            const int ms = 700 + int(QRandomGenerator::global()->bounded(1300));
+            volatile double sink = 0;
+            while (busy.elapsed() < ms) {
+                sink = sink + 1.0;
+            }
+            timer.start(2000 + int(QRandomGenerator::global()->bounded(5000)));
+        });
+        timer.start(1500);
+    } else {
+        QObject::connect(&timer, &QTimer::timeout, &app, [] { QTextStream(stdout) << "heartbeat 模型\n"
+                                                                                  << Qt::flush; });
+        timer.start(100);
+    }
     if (misbehave && qEnvironmentVariableIsSet("FAKE_EXIT")) {
         QTimer::singleShot(250, &app, [] { QCoreApplication::exit(42); });
     }
