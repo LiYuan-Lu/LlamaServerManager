@@ -20,6 +20,8 @@ class AgentClient : public QObject {
     // The model whose console is shown in logText.
     Q_PROPERTY(QString selectedId READ selectedId WRITE setSelectedId NOTIFY selectedIdChanged)
     Q_PROPERTY(QString logText READ logText NOTIFY logsChanged)
+    // Watchdog restart history of the selected model, newest last.
+    Q_PROPERTY(QVariantList restartHistory READ restartHistory NOTIFY restartHistoryChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
 public:
@@ -33,6 +35,7 @@ public:
     QString selectedId() const { return selected; }
     void setSelectedId(const QString &id);
     QString logText() const { return logs.value(selected).text; }
+    QVariantList restartHistory() const { return history; }
     QString error() const { return lastError; }
     bool busy() const { return !pending.isEmpty(); }
     Q_INVOKABLE void connectAgent();
@@ -53,6 +56,7 @@ signals:
     void profileChanged(const QString &profileId);
     void profileCreated(const QString &profileId);
     void logsChanged();
+    void restartHistoryChanged();
     void errorChanged();
     void busyChanged();
 private:
@@ -74,6 +78,7 @@ private:
     QVariantMap raw, view;
     QHash<QString, QVariantMap> profiles;
     QHash<QString, Log> logs;
+    QVariantList history;
     QString selected, agentWarning, lastError;
     qint64 lastLaunch = 0;
     QHash<QString, Pending> pending;

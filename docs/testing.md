@@ -70,3 +70,36 @@ Remove-Item Env:\LSM_TEST_REAL_EXE,Env:\LSM_TEST_REAL_MODEL
 - 未做 Phase 2–4 的自動復原、HTTP watchdog、效能監控、多實例或系統整合測試。
 
 人工驗收：開啟 deploy/llama-manager.exe → 瀏覽 exe/GGUF → 儲存 → 啟動 → 看到載入完成 → 關閉視窗 → 重開確認 PID 與日誌 → 停止，確認該 PID 結束。
+
+# 多模型與 Phase 2 Watchdog 測試紀錄
+
+測試環境：Ubuntu 24.04、GCC、Qt 6.4.2（`QT_QPA_PLATFORM=offscreen`）。僅為驗證用，CMake 最低版本暫時降為 6.4；專案本身仍要求 Qt 6.5。**以下結果皆未在 Windows 上執行。**
+
+## 已執行
+
+- 全部 targets 編譯成功，無警告。
+- 13 項中 12 項通過，連續 3 輪皆通過（`guiDetachedAgent` 只在 Windows 執行，已略過）。
+- 以 fake server 建立 4 個模型（健康、載入中、重啟等待中、超過上限而放棄），截取英文與繁中 GUI 畫面檢查。
+
+## 新增 / 更新的自動測試
+
+| 測試 | 驗證 |
+| --- | --- |
+| restartPolicy | 冷卻與指數退避（含上限）、時間窗內重啟上限、時間窗過後恢復額度、reset、maxRestarts=0 |
+| healthMonitor | 200 → Healthy、503 → Loading、萬用位址改走 loopback、卡住的伺服器逾時且請求不重疊、舊 generation 的延遲回應不會送出、連線被拒 |
+| watchdogStartupGrace | 寬限期內載入中的 503 不算故障；寬限期後仍未健康 → FAILED，並停止卡住的程序 |
+| watchdogCrashRecovery | 第一次當掉 → 自動重啟 → RUNNING，紀錄為 recovered 且 PID 改變；新的 supervisor 會讀回紀錄；關閉自動重啟時當掉 → FAILED，不重啟 |
+| watchdogHealthRestart | /health 停止回應 → 連續失敗 → RESTARTING → 新 PID 復原；關閉自動重啟時維持 UNHEALTHY 且程序繼續執行；可從 UNHEALTHY 手動重啟 |
+| watchdogLimitsAndManualStop | 一直當掉：重啟 3 次（出現 BACKOFF）後 FAILED，不會無限重啟；等待重啟期間手動停止會取消重啟；放棄後手動啟動會重新計算額度 |
+| persistenceAndValidation | 另外驗證 watchdog 欄位：預設值、範圍、型別，以及舊設定檔沒有 watchdog 欄位時套用預設值 |
+| agentAndGuiReconnect | 另外驗證 getRestartHistory 與 RUNNING 時 health=Healthy |
+
+CTest 每項測試的 timeout 由 60 秒提高為 180 秒，讓選用的真實模型測試有時間載入（RUNNING 現在代表 /health 已回傳 200）。
+
+Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1「秒」縮短為 100 ms。FakeServer 現在提供真的 HTTP `/health`，可用環境變數控制：`FAKE_HEALTH_LOADING_MS`（先回 503）、`FAKE_HEALTH_HANG_AFTER_MS`（之後不回應）、`FAKE_ONCE_FILE`（只有第一次執行會出問題）。
+
+## 尚未驗證
+
+- Windows 建置與 CTest（請執行上方「重現」的指令）。
+- Windows 上的 Stop 會先 terminate，3 秒後才 kill；因 health 失敗而重啟時，Windows 會比 Linux 多等約 3 秒。測試的逾時已預留空間，但尚未實際在 Windows 上跑過。
+- 真實 llama-server：載入期間的 503 → 200 轉換、長時間執行時 health 檢查的穩定性。

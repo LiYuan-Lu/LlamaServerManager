@@ -46,10 +46,13 @@ AgentServer::Instance *AgentServer::find(const QString &id) const {
     return nullptr;
 }
 AgentServer::Instance *AgentServer::add(const Profile &profile) {
-    auto *instance = new Instance{profile, new LlamaProcessManager(this), new LogStore(directory + "/logs/" + profile.id, this)};
-    const QString id = profile.id;
-    connect(instance->manager, &LlamaProcessManager::log, instance->logs, &LogStore::append);
-    connect(instance->manager, &LlamaProcessManager::changed, this, [this] { broadcast("status", snapshot()); });
+    const QString id = profile.id, logDir = directory + "/logs/" + id;
+    auto *instance = new Instance{profile, new ServerSupervisor(id, logDir + "/restart-history.json", this), new LogStore(logDir, this)};
+    connect(instance->manager, &ServerSupervisor::log, instance->logs, &LogStore::append);
+    connect(instance->manager, &ServerSupervisor::changed, this, [this] { broadcast("status", snapshot()); });
+    connect(instance->manager, &ServerSupervisor::historyChanged, this, [this, id] {
+        if (auto *i = find(id)) broadcast("history", {{"profileId", id}, {"entries", i->manager->history()}});
+    });
     connect(instance->logs, &LogStore::entry, this, [this, id](const QJsonObject &entry) {
         auto record = entry; record["profileId"] = id; broadcast("log", record);
     });
@@ -114,7 +117,7 @@ void AgentServer::command(QLocalSocket *socket, const QJsonObject &m) {
     const QString id = m["id"].toString(), cmd = m["command"].toString(), profileId = m["profileId"].toString();
     QString error; QJsonObject data;
     if (id.isEmpty() || id.size() > 128) { socket->abort(); return; }
-    const bool needsInstance = cmd == "getLogs" || cmd == "updateProfile" || cmd == "deleteProfile"
+    const bool needsInstance = cmd == "getLogs" || cmd == "getRestartHistory" || cmd == "updateProfile" || cmd == "deleteProfile"
         || cmd == "startServer" || cmd == "stopServer" || cmd == "restartServer";
     Instance *instance = needsInstance ? find(profileId) : nullptr;
     if (needsInstance && !instance) error = profileId.isEmpty() ? "Missing profileId" : "Unknown profile: " + profileId;
@@ -123,6 +126,7 @@ void AgentServer::command(QLocalSocket *socket, const QJsonObject &m) {
         QJsonArray list; for (const auto &p : profiles()) list.append(p.toJson());
         data = {{"profiles", list}};
     } else if (cmd == "getLogs") data = {{"profileId", profileId}, {"entries", instance->logs->snapshot()}};
+    else if (cmd == "getRestartHistory") data = {{"profileId", profileId}, {"entries", instance->manager->history()}};
     else if (cmd == "createProfile") {
         Profile candidate;
         if (!m["profile"].isObject()) error = "Missing profile object";

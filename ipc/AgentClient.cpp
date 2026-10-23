@@ -16,7 +16,7 @@ AgentClient::AgentClient(QString dir, bool launch, QObject *parent) : QObject(pa
     connect(&socket, &QLocalSocket::connected, this, [this] {
         buffer.clear(); logs.clear(); synced = false; emit logsChanged(); setError({}); emit connectedChanged();
         send("getStatus");
-        if (!selected.isEmpty()) send("getLogs", {{"profileId", selected}});
+        if (!selected.isEmpty()) { send("getLogs", {{"profileId", selected}}); send("getRestartHistory", {{"profileId", selected}}); }
     });
     connect(&socket, &QLocalSocket::disconnected, this, [this] {
         pending.clear(); buffer.clear(); synced = false; rebuild(); emit busyChanged(); emit connectedChanged();
@@ -88,8 +88,11 @@ QString AgentClient::localPath(const QUrl &url) const { return url.toLocalFile()
 void AgentClient::clearLogs() { if (logs.contains(selected)) { logs[selected].text.clear(); emit logsChanged(); } }
 void AgentClient::setSelectedId(const QString &id) {
     if (selected == id) return;
-    selected = id; emit selectedIdChanged(); emit logsChanged();
-    if (!id.isEmpty() && connected() && ids.contains(id)) send("getLogs", {{"profileId", id}});
+    selected = id; history.clear(); emit selectedIdChanged(); emit logsChanged(); emit restartHistoryChanged();
+    if (!id.isEmpty() && connected() && ids.contains(id)) {
+        send("getLogs", {{"profileId", id}});
+        send("getRestartHistory", {{"profileId", id}});
+    }
 }
 void AgentClient::rebuild() {
     view.clear();
@@ -139,6 +142,9 @@ void AgentClient::receive() {
             if (event == "status") applyStatus(data);
             else if (event == "log") appendLog(data["profileId"].toString(), data);
             else if (event == "warning") setError(data["message"].toString());
+            else if (event == "history" && data["profileId"].toString() == selected) {
+                history = data["entries"].toArray().toVariantList(); emit restartHistoryChanged();
+            }
         } else {
             const auto id = m["id"].toString();
             if (!pending.contains(id)) continue;
@@ -147,6 +153,9 @@ void AgentClient::receive() {
             if (data.contains("instances")) applyStatus(data);
             if (request.command == "updateProfile") emit profileChanged(request.profileId);
             else if (request.command == "createProfile") emit profileCreated(data["id"].toString());
+            else if (request.command == "getRestartHistory") {
+                if (data["profileId"].toString() == selected) { history = data["entries"].toArray().toVariantList(); emit restartHistoryChanged(); }
+            }
             else if (request.command == "getLogs") {
                 const auto profileId = data["profileId"].toString();
                 logs[profileId] = {};

@@ -1,8 +1,10 @@
-# Phase 1 architecture
+# Architecture
 
-GUI (`QGuiApplication`) → AgentClient → per-user QLocalSocket → AgentServer (`QCoreApplication`) → one Instance per profile (LlamaProcessManager + LogStore) → QProcess → llama-server.
+GUI (`QGuiApplication`) → AgentClient → per-user QLocalSocket → AgentServer (`QCoreApplication`) → one Instance per profile (ServerSupervisor + LogStore) → LlamaProcessManager → QProcess → llama-server.
 
-Each saved profile is one model. The Agent creates an independent LlamaProcessManager and LogStore (`logs/<profile-id>/`) for every profile, so models start, stop, restart, and fail independently. Profiles cannot be edited or deleted while their model is active. Before starting, the Agent rejects a port already used by another active model.
+ServerSupervisor is the per-model watchdog: it combines LlamaProcessManager with HealthMonitor (GET /health) and RestartPolicy, keeps the restart history, and owns the user-visible state. See phase2.md.
+
+Each saved profile is one model. The Agent creates an independent ServerSupervisor and LogStore (`logs/<profile-id>/`) for every profile, so models start, stop, restart, and fail independently. Profiles cannot be edited or deleted while their model is active. Before starting, the Agent rejects a port already used by another active model.
 
 The GUI opens on a grid of model cards. Each card shows the state, model file, address, PID, and uptime, with one Start/Stop toggle button and a Restart button. The trailing + card opens an empty editor; saving it sends createProfile. Clicking a card opens its detail page with the controls, the profile editor, the model's console, and Delete.
 
@@ -10,13 +12,13 @@ The GUI never owns the llama-server QProcess. The Agent is launched with startDe
 
 ## States
 
-STOPPED / FAILED → STARTING (asynchronous --help preflight and OS process launch) → RUNNING.
-STARTING / RUNNING → STOPPING → STOPPED.
-Unexpected exits and launch failures → FAILED. RUNNING means the OS process exists; it carries no HTTP health guarantee.
+Process level (LlamaProcessManager): STOPPED / FAILED → STARTING (asynchronous --help preflight and OS process launch) → RUNNING (the OS process exists); STARTING / RUNNING → STOPPING → STOPPED; unexpected exits and launch failures → FAILED.
 
-A manual restart of an active server is accepted only in RUNNING and stops the process before starting it again. In STOPPED or FAILED, restart acts as start. STARTING and STOPPING reject additional start/restart commands. Stop cancels a pending restart. Both --help and OS process creation have 10-second timeouts; Stop falls back to kill after three seconds. Model loading itself has no deadline, so a large model is not terminated merely for loading slowly.
+Model level (ServerSupervisor, shown in the GUI): STOPPED, STARTING, RUNNING, UNHEALTHY, RESTARTING, BACKOFF, FAILED, STOPPING. With health checks enabled, STARTING lasts until /health returns 200. Crashes, startup failures, and failed health checks are handed to RestartPolicy. See phase2.md for the full table.
 
-Profile is a data type; ProfileStore handles files. LlamaProcessManager does not depend on QML or IPC. AgentServer coordinates commands. Tests can instantiate the process manager directly or launch the complete Agent.
+A manual restart is accepted in RUNNING, UNHEALTHY, RESTARTING, and BACKOFF; in STOPPED or FAILED it acts as start. Stop cancels any pending automatic restart. Both --help and OS process creation have 10-second timeouts; Stop falls back to kill after three seconds. Model loading is bounded only by the configurable startup grace period (default 600 seconds).
+
+Profile is a data type; ProfileStore handles files. LlamaProcessManager, HealthMonitor, RestartPolicy, and ServerSupervisor do not depend on QML or IPC. AgentServer coordinates commands. Tests can instantiate the process manager directly or launch the complete Agent.
 
 ## Process ownership
 

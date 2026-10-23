@@ -1,5 +1,5 @@
 #pragma once
-#include "core/LlamaProcessManager.h"
+#include "core/ServerSupervisor.h"
 #include "core/ProfileStore.h"
 #include "core/LogStore.h"
 #include <QLocalServer>
@@ -12,10 +12,10 @@ public:
     ~AgentServer() override;
     bool listen(QString &error);
 private:
-    // One managed llama-server per profile; each has its own process manager and log.
+    // One managed llama-server per profile; each has its own watchdog supervisor and log.
     struct Instance {
         Profile profile;
-        LlamaProcessManager *manager = nullptr;
+        ServerSupervisor *manager = nullptr;
         LogStore *logs = nullptr;
     };
     void receive(QLocalSocket *socket);

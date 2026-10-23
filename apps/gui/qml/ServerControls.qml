@@ -29,7 +29,7 @@ RowLayout {
     Button {
         text: qsTr("⟳ Restart")
         opacity: enabled ? 1 : 0.45
-        enabled: agent.connected && controls.serverState === "RUNNING" && !controls.busy
+        enabled: agent.connected && !controls.busy && ["RUNNING", "UNHEALTHY", "BACKOFF", "RESTARTING"].indexOf(controls.serverState) >= 0
         onClicked: agent.restart(controls.profileId)
     }
 }

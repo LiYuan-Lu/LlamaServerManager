@@ -23,6 +23,12 @@ ColumnLayout {
         threads.text = String(p.threads || 4); parallel.text = String(p.parallel || 1)
         metrics.checked = p.metrics || false
         extra.text = JSON.stringify(p.extraArguments || []); env.text = JSON.stringify(p.environment || {})
+        const w = p.watchdog || {}
+        autoRestart.checked = w.autoRestart !== false; healthCheck.checked = w.healthCheck !== false
+        wdInterval.text = String(w.intervalSeconds || 30); wdTimeout.text = String(w.timeoutSeconds || 5)
+        wdThreshold.text = String(w.failureThreshold || 3); wdGrace.text = String(w.startupGraceSeconds || 600)
+        wdCooldown.text = String(w.cooldownSeconds === undefined ? 5 : w.cooldownSeconds); wdBackoff.text = String(w.maxBackoffSeconds || 300)
+        wdMax.text = String(w.maxRestarts === undefined ? 3 : w.maxRestarts); wdWindow.text = String(w.windowSeconds || 600)
         dirty = false; validationError = ""
     }
     function save() {
@@ -30,12 +36,16 @@ ColumnLayout {
             const args = JSON.parse(extra.text), variables = JSON.parse(env.text)
             if (!Array.isArray(args) || typeof variables !== "object" || variables === null || Array.isArray(variables)) throw new Error(qsTr("Extra arguments must be a JSON array, and environment variables must be a JSON object"))
             const values = [port.text, context.text, gpu.text, threads.text, parallel.text].map(Number)
-            if (values.some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
+            const wd = [wdInterval.text, wdTimeout.text, wdThreshold.text, wdGrace.text, wdCooldown.text, wdBackoff.text, wdMax.text, wdWindow.text].map(Number)
+            if (values.concat(wd).some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
             if (name.text.trim().length === 0) throw new Error(qsTr("Enter a name for this model"))
             validationError = ""
             const profile = {name: name.text.trim(), executable: exe.text, model: model.text, workingDirectory: cwd.text,
                 host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],
-                metrics: metrics.checked, extraArguments: args, environment: variables}
+                metrics: metrics.checked, extraArguments: args, environment: variables,
+                watchdog: {autoRestart: autoRestart.checked, healthCheck: healthCheck.checked,
+                    intervalSeconds: wd[0], timeoutSeconds: wd[1], failureThreshold: wd[2], startupGraceSeconds: wd[3],
+                    cooldownSeconds: wd[4], maxBackoffSeconds: wd[5], maxRestarts: wd[6], windowSeconds: wd[7]}}
             savePending = true
             if (profileId === "") agent.createProfile(profile)
             else agent.saveProfile(profileId, profile)
@@ -91,6 +101,38 @@ ColumnLayout {
         TextField { id: extra; Layout.fillWidth: true; placeholderText: '["--verbose"]'; onTextEdited: editor.dirty = true }
         Label { text: qsTr("Environment variables (JSON)") }
         TextField { id: env; Layout.fillWidth: true; placeholderText: '{"NAME":"value"}'; onTextEdited: editor.dirty = true }
+    }
+    GroupBox {
+        title: qsTr("Watchdog")
+        Layout.fillWidth: true; enabled: editor.editable
+        ColumnLayout {
+            anchors.fill: parent; spacing: 6
+            RowLayout {
+                CheckBox { id: autoRestart; text: qsTr("Restart automatically after crashes, startup failures, and failed health checks"); onClicked: editor.dirty = true }
+            }
+            RowLayout {
+                CheckBox { id: healthCheck; text: qsTr("Check GET /health (STARTING lasts until it returns 200)"); onClicked: editor.dirty = true }
+            }
+            GridLayout {
+                columns: 8; Layout.fillWidth: true
+                Label { text: qsTr("Interval (s)") }
+                TextField { id: wdInterval; Layout.preferredWidth: 70; enabled: healthCheck.checked; validator: IntValidator { bottom: 1; top: 3600 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Timeout (s)") }
+                TextField { id: wdTimeout; Layout.preferredWidth: 70; enabled: healthCheck.checked; validator: IntValidator { bottom: 1; top: 300 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Failures before unhealthy") }
+                TextField { id: wdThreshold; Layout.preferredWidth: 70; enabled: healthCheck.checked; validator: IntValidator { bottom: 1; top: 100 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Startup grace (s)") }
+                TextField { id: wdGrace; Layout.preferredWidth: 70; enabled: healthCheck.checked; validator: IntValidator { bottom: 1; top: 86400 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Restart cooldown (s)") }
+                TextField { id: wdCooldown; Layout.preferredWidth: 70; enabled: autoRestart.checked; validator: IntValidator { bottom: 0; top: 3600 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Max backoff (s)") }
+                TextField { id: wdBackoff; Layout.preferredWidth: 70; enabled: autoRestart.checked; validator: IntValidator { bottom: 0; top: 86400 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Max restarts") }
+                TextField { id: wdMax; Layout.preferredWidth: 70; enabled: autoRestart.checked; validator: IntValidator { bottom: 0; top: 100 } onTextEdited: editor.dirty = true }
+                Label { text: qsTr("Within (s)") }
+                TextField { id: wdWindow; Layout.preferredWidth: 70; enabled: autoRestart.checked; validator: IntValidator { bottom: 1; top: 86400 } onTextEdited: editor.dirty = true }
+            }
+        }
     }
     RowLayout {
         Button { text: editor.profileId === "" ? qsTr("Add model") : qsTr("Save profile"); enabled: editor.editable && !editor.savePending; onClicked: editor.save() }

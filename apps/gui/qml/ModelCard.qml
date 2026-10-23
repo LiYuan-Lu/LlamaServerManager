@@ -10,10 +10,31 @@ Rectangle {
     readonly property var profile: info.profile || ({})
     readonly property string serverState: info.state || "STOPPED"
     signal open()
+    function healthText(health) {
+        if (!health) return "—"
+        if (health === "Healthy") return qsTr("Healthy")
+        if (health === "Disabled") return qsTr("Health checks off")
+        if (health === "Not running") return qsTr("Not running")
+        if (health.indexOf("Loading model") === 0) return qsTr("Loading model (HTTP 503)")
+        if (health.indexOf("Waiting for /health") === 0) return qsTr("Waiting for /health")
+        return health
+    }
     implicitHeight: 176
     radius: 10
     color: hover.hovered ? "#243244" : "#1f2937"
-    border.color: serverState === "RUNNING" ? "#065f46" : serverState === "FAILED" ? "#7f1d1d" : "#334155"
+    border.color: serverState === "RUNNING" ? "#065f46" : serverState === "FAILED" ? "#7f1d1d"
+        : serverState === "UNHEALTHY" || serverState === "BACKOFF" || serverState === "RESTARTING" ? "#9a3412" : "#334155"
+    readonly property string watchdogText: {
+        const s = serverState, i = info
+        let text = ""
+        if (s === "RESTARTING" || s === "BACKOFF")
+            text = i.nextRestartSeconds > 0 ? qsTr("Restart %1/%2 in %3 s").arg(i.restartAttempt).arg(i.maxRestarts).arg(i.nextRestartSeconds)
+                                            : qsTr("Restarting (attempt %1/%2)…").arg(i.restartAttempt).arg(i.maxRestarts)
+        else if (s === "STARTING") text = (profile.watchdog || {}).healthCheck === false ? qsTr("Starting…") : qsTr("Loading model…")
+        else if (s === "RUNNING") text = i.health === "Healthy" ? "✓ " + qsTr("Healthy") : card.healthText(i.health)
+        if ((profile.watchdog || {}).autoRestart === false) text += (text ? "  ·  " : "") + qsTr("Auto restart off")
+        return text
+    }
     border.width: 1
 
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
@@ -41,7 +62,13 @@ Rectangle {
             color: "#cbd5e1"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
         }
         Label {
-            text: card.serverState === "FAILED" ? (card.info.error || "") : ""
+            text: card.watchdogText
+            visible: text.length > 0
+            color: card.serverState === "RUNNING" && card.info.health === "Healthy" ? "#6ee7b7" : "#cbd5e1"
+            font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
+        }
+        Label {
+            text: ["FAILED", "UNHEALTHY", "BACKOFF", "RESTARTING"].indexOf(card.serverState) >= 0 ? (card.info.error || "") : ""
             visible: text.length > 0
             color: "#fca5a5"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
         }

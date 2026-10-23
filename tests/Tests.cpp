@@ -10,6 +10,10 @@
 #include "core/LlamaProcessManager.h"
 #include "core/ProfileStore.h"
 #include "core/LogStore.h"
+#include "core/RestartPolicy.h"
+#include "core/HealthMonitor.h"
+#include "core/ServerSupervisor.h"
+#include <QTcpSocket>
 #include "ipc/Protocol.h"
 #include <QLockFile>
 #ifdef Q_OS_WIN
@@ -51,6 +55,43 @@ class Tests : public QObject {
         }
         return {};
     }
+    // Watchdog tests run with 1 configured "second" = 100 ms.
+    Profile watchdogProfile(const QString &dir, const QJsonObject &environment = {}) {
+        auto p = profile(dir);
+        p.environment = environment;
+        auto &w = p.watchdog;
+        w.intervalSeconds = 1; w.timeoutSeconds = 2; w.failureThreshold = 2; w.startupGraceSeconds = 30;
+        w.cooldownSeconds = 1; w.maxBackoffSeconds = 4; w.maxRestarts = 3; w.windowSeconds = 600;
+        return p;
+    }
+    struct TimeScale { TimeScale() { ServerSupervisor::setTimeScale(100); } ~TimeScale() { ServerSupervisor::setTimeScale(1000); } };
+    // Minimal HTTP endpoint for HealthMonitor tests: replies with `status` after `delayMs`, or never if status == 0.
+    struct FakeHttp : QObject {
+        QTcpServer server; int status = 200, delayMs = 0, requests = 0, open = 0, maxOpen = 0;
+        FakeHttp() {
+            server.listen(QHostAddress::LocalHost, 0);
+            connect(&server, &QTcpServer::newConnection, this, [this] {
+                while (auto *socket = server.nextPendingConnection()) {
+                    ++open; maxOpen = qMax(maxOpen, open);
+                    connect(socket, &QTcpSocket::disconnected, this, [this, socket] { --open; socket->deleteLater(); });
+                    connect(socket, &QTcpSocket::readyRead, this, [this, socket] {
+                        if (!socket->readAll().contains("\r\n\r\n")) return;
+                        ++requests;
+                        if (status == 0) return;
+                        const int code = status;
+                        QTimer::singleShot(delayMs, socket, [socket, code] {
+                            socket->write(QString("HTTP/1.1 %1 X\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").arg(code).toLatin1());
+                            socket->disconnectFromHost();
+                        });
+                    });
+                }
+            });
+        }
+        int port() const { return server.serverPort(); }
+    };
+    QStringList outcomes(const QJsonArray &history) {
+        QStringList list; for (const auto &e : history) list << e.toObject()["outcome"].toString(); return list;
+    }
 private slots:
     void guiDetachedAgent() {
 #ifdef Q_OS_WIN
@@ -70,6 +111,163 @@ private slots:
 #else
         QSKIP("Windows detached Agent test");
 #endif
+    }
+    void restartPolicy() {
+        RestartPolicy policy({3, 600000, 5000, 15000});
+        auto d = policy.onFailure(0); QVERIFY(d.restart); QCOMPARE(d.attempt, 1); QCOMPARE(d.delayMs, 5000);
+        d = policy.onFailure(1000); QVERIFY(d.restart); QCOMPARE(d.attempt, 2); QCOMPARE(d.delayMs, 10000);
+        d = policy.onFailure(2000); QVERIFY(d.restart); QCOMPARE(d.attempt, 3); QCOMPARE(d.delayMs, 15000); // capped
+        d = policy.onFailure(3000); QVERIFY(!d.restart); QCOMPARE(d.attempt, 4);
+        QCOMPARE(policy.recentRestarts(3000), 3);
+        // Restarts older than the window no longer count.
+        QCOMPARE(policy.recentRestarts(600500), 2);
+        d = policy.onFailure(600500); QVERIFY(d.restart); QCOMPARE(d.attempt, 3);
+        policy.reset(); d = policy.onFailure(600600); QCOMPARE(d.attempt, 1); QCOMPARE(d.delayMs, 5000);
+        RestartPolicy never({0, 600000, 1000, 1000}); QVERIFY(!never.onFailure(0).restart);
+    }
+    void healthMonitor() {
+        qRegisterMetaType<HealthMonitor::Outcome>();
+        FakeHttp http; HealthMonitor monitor; QSignalSpy results(&monitor, &HealthMonitor::result);
+        monitor.start(1, "127.0.0.1", http.port(), 50, 1000);
+        QTRY_VERIFY(results.size() >= 2);
+        QCOMPARE(results.first()[0].toULongLong(), 1ULL);
+        QCOMPARE(results.first()[1].value<HealthMonitor::Outcome>(), HealthMonitor::Outcome::Healthy);
+        monitor.stop(); results.clear();
+        http.status = 503; monitor.start(2, "0.0.0.0", http.port(), 50, 1000); // wildcard host is checked via loopback
+        QTRY_VERIFY(!results.isEmpty());
+        QCOMPARE(results.first()[1].value<HealthMonitor::Outcome>(), HealthMonitor::Outcome::Loading);
+        monitor.stop(); results.clear();
+        // A hung server: requests time out and never overlap.
+        http.status = 0; http.requests = 0; http.maxOpen = 0;
+        monitor.start(3, "127.0.0.1", http.port(), 10, 200);
+        QTest::qWait(900);
+        QVERIFY(!results.isEmpty()); QVERIFY(http.requests <= 5); QVERIFY(http.maxOpen <= 1);
+        for (const auto &r : results) {
+            QCOMPARE(r[1].value<HealthMonitor::Outcome>(), HealthMonitor::Outcome::Failure);
+            QVERIFY(r[3].toString().contains("timed out"));
+        }
+        monitor.stop(); results.clear();
+        // A slow reply from an older generation is never delivered after stop()/start().
+        http.status = 200; http.delayMs = 300;
+        monitor.start(4, "127.0.0.1", http.port(), 1000, 2000);
+        QTest::qWait(100); monitor.stop();
+        monitor.start(5, "127.0.0.1", http.port(), 1000, 2000);
+        QTest::qWait(800);
+        QVERIFY(!results.isEmpty());
+        for (const auto &r : results) QCOMPARE(r[0].toULongLong(), 5ULL);
+        monitor.stop(); results.clear();
+        // Connection refused.
+        int closedPort = freePort(); monitor.start(6, "127.0.0.1", closedPort, 1000, 1000);
+        QTRY_VERIFY(!results.isEmpty());
+        QCOMPARE(results.first()[1].value<HealthMonitor::Outcome>(), HealthMonitor::Outcome::Failure);
+    }
+    void watchdogStartupGrace() {
+        TimeScale scale; QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        // Loading-time 503s inside the grace period are not failures.
+        ServerSupervisor supervisor("grace", dir.path() + "/history.json");
+        auto p = watchdogProfile(dir.path(), {{"FAKE_HEALTH_LOADING_MS", "1200"}});
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.status()["health"].toString().contains("503"), 5000);
+        QCOMPARE(supervisor.state(), QString("STARTING"));
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 8000);
+        QVERIFY(supervisor.history().isEmpty());
+        supervisor.stop(); QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+        // A model that never becomes healthy fails once the grace period ends.
+        p = watchdogProfile(dir.path(), {{"FAKE_HEALTH_LOADING_MS", "60000"}});
+        p.watchdog.startupGraceSeconds = 8; p.watchdog.autoRestart = false;
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("FAILED"), 8000);
+        QVERIFY(supervisor.status()["error"].toString().contains("did not become healthy"));
+        QCOMPARE(supervisor.history().size(), 1);
+        QCOMPARE(supervisor.history().last().toObject()["kind"].toString(), QString("startup"));
+        QCOMPARE(supervisor.history().last().toObject()["outcome"].toString(), QString("auto restart disabled"));
+        // FAILED after the grace period: the stuck process is not left running.
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.status()["pid"].toInteger() == 0, 6000);
+    }
+    void watchdogCrashRecovery() {
+        TimeScale scale; QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        ServerSupervisor supervisor("crash", dir.path() + "/history.json");
+        // Crashes on the first run only; the automatic restart recovers.
+        auto p = watchdogProfile(dir.path(), {{"FAKE_EXIT", "1"}, {"FAKE_ONCE_FILE", dir.path() + "/crashed"}});
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.history().size() == 1, 5000);
+        auto entry = supervisor.history().first().toObject();
+        QCOMPARE(entry["kind"].toString(), QString("crash")); QCOMPARE(entry["attempt"].toInt(), 1);
+        QVERIFY(entry["reason"].toString().contains("42")); QVERIFY(entry["pid"].toInteger() > 0);
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.state() == "RUNNING" && outcomes(supervisor.history()) == QStringList{"recovered"}, 8000);
+        QVERIFY(supervisor.status()["pid"].toInteger() != entry["pid"].toInteger());
+        supervisor.stop(); QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+        // History survives a new supervisor (Agent restart).
+        ServerSupervisor reloaded("crash", dir.path() + "/history.json");
+        QCOMPARE(outcomes(reloaded.history()), QStringList{"recovered"});
+        // Auto restart disabled: a crash ends in FAILED without a restart.
+        p.watchdog.autoRestart = false; p.environment = {{"FAKE_EXIT", "1"}};
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("FAILED"), 5000);
+        QTest::qWait(500);
+        QCOMPARE(supervisor.state(), QString("FAILED"));
+        QCOMPARE(outcomes(supervisor.history()).last(), QString("auto restart disabled"));
+    }
+    void watchdogHealthRestart() {
+        TimeScale scale; QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        ServerSupervisor supervisor("health", dir.path() + "/history.json");
+        QSignalSpy states(&supervisor, &ServerSupervisor::changed);
+        // /health stops answering on the first run; the watchdog restarts the process.
+        auto p = watchdogProfile(dir.path(), {{"FAKE_HEALTH_HANG_AFTER_MS", "600"}, {"FAKE_ONCE_FILE", dir.path() + "/hung"}});
+        QStringList seen;
+        connect(&supervisor, &ServerSupervisor::changed, this, [&] { if (seen.isEmpty() || seen.last() != supervisor.state()) seen << supervisor.state(); });
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 5000);
+        const auto firstPid = supervisor.status()["pid"].toInteger();
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.history().size() == 1, 10000);
+        QCOMPARE(supervisor.history().first().toObject()["kind"].toString(), QString("health"));
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.state() == "RUNNING" && outcomes(supervisor.history()) == QStringList{"recovered"}, 15000);
+        QVERIFY(supervisor.status()["pid"].toInteger() != firstPid);
+        QVERIFY2(seen.contains("RESTARTING"), qPrintable(seen.join(",")));
+        supervisor.stop(); QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+        // Without auto restart the model is only marked UNHEALTHY and keeps running.
+        QFile::remove(dir.path() + "/hung");
+        p.watchdog.autoRestart = false;
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("UNHEALTHY"), 10000);
+        QVERIFY(supervisor.status()["pid"].toInteger() > 0);
+        QCOMPARE(outcomes(supervisor.history()).last(), QString("auto restart disabled"));
+        QVERIFY(supervisor.restart(p).isEmpty()); // manual restart is allowed from UNHEALTHY
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 10000);
+        supervisor.stop(); QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+    }
+    void watchdogLimitsAndManualStop() {
+        TimeScale scale; QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        ServerSupervisor supervisor("limits", dir.path() + "/history.json");
+        QStringList seen;
+        connect(&supervisor, &ServerSupervisor::changed, this, [&] { if (seen.isEmpty() || seen.last() != supervisor.state()) seen << supervisor.state(); });
+        // Always crashes while loading: three restarts with growing delays, then FAILED instead of looping.
+        auto p = watchdogProfile(dir.path(), {{"FAKE_EXIT", "1"}, {"FAKE_HEALTH_LOADING_MS", "60000"}});
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("FAILED"), 15000);
+        QCOMPARE(outcomes(supervisor.history()), (QStringList{"failed", "failed", "failed", "gave up: restart limit reached"}));
+        QVERIFY(supervisor.status()["error"].toString().contains("Restart limit"));
+        QVERIFY2(seen.contains("BACKOFF"), qPrintable(seen.join(",")));
+        QTest::qWait(1000);
+        QCOMPARE(supervisor.state(), QString("FAILED"));
+        QCOMPARE(supervisor.history().size(), 4);
+        // Manual Stop during a pending restart cancels it.
+        p.watchdog.cooldownSeconds = 20; p.watchdog.maxBackoffSeconds = 20;
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RESTARTING"), 5000);
+        QVERIFY(supervisor.status()["nextRestartSeconds"].toInt() > 0);
+        QVERIFY(supervisor.stop().isEmpty());
+        QCOMPARE(supervisor.state(), QString("STOPPED"));
+        QTest::qWait(2500);
+        QCOMPARE(supervisor.state(), QString("STOPPED"));
+        QCOMPARE(supervisor.status()["pid"].toInteger(), 0);
+        QCOMPARE(outcomes(supervisor.history()).last(), QString("cancelled by manual stop"));
+        // A manual start after giving up begins with a fresh restart budget.
+        p.environment = {};
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 5000);
+        QCOMPARE(supervisor.status()["restartsInWindow"].toInt(), 0);
+        supervisor.stop(); QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
     }
     void protocolFraming() {
         QByteArray buffer = "{\"version\":1"; QJsonObject m; QString error;
@@ -104,6 +302,11 @@ private slots:
         p.extraArguments = {"--port=1234"}; QVERIFY(!p.validate().isEmpty());
         p.extraArguments = {}; p.id = "../escape"; QVERIFY(!p.validate(false).isEmpty());
         auto o = p.toJson(); o["port"] = 1.5; QVERIFY(!Profile::fromJson(o, p, error));
+        o = Profile().toJson(); QCOMPARE(o["watchdog"].toObject()["intervalSeconds"].toInt(), 30);
+        auto w = o["watchdog"].toObject(); w["intervalSeconds"] = 0; o["watchdog"] = w; QVERIFY(!Profile::fromJson(o, p, error));
+        w["intervalSeconds"] = 10; w["autoRestart"] = "yes"; o["watchdog"] = w; QVERIFY(!Profile::fromJson(o, p, error));
+        w["autoRestart"] = false; o["watchdog"] = w; QVERIFY(Profile::fromJson(o, p, error)); QVERIFY(!p.watchdog.autoRestart);
+        o.remove("watchdog"); QVERIFY(Profile::fromJson(o, p, error)); QVERIFY(p.watchdog.autoRestart); // older files get defaults
     }
     void boundedLogs() {
         QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX"); LogStore log(dir.path(), nullptr, 4096);
@@ -168,7 +371,8 @@ private slots:
         QVERIFY(!rpc(socket, "startServer")["ok"].toBool()); // profileId is required
         QVERIFY(rpc(socket, "startServer", {{"profileId", id}})["ok"].toBool());
         QJsonObject status;
-        QTRY_VERIFY_WITH_TIMEOUT(([&] { status = instance(socket, id); return status["state"] == "RUNNING"; })(), 10000);
+        // RUNNING now means /health returned 200, so a real model needs its loading time.
+        QTRY_VERIFY_WITH_TIMEOUT(([&] { status = instance(socket, id); return status["state"] == "RUNNING"; })(), realModel ? 120000 : 10000);
         const auto pid = status["pid"].toInteger(); QVERIFY(pid > 0);
         if (realModel) {
             // Acceptance-only check, deliberately not a product HealthMonitor.
@@ -186,6 +390,9 @@ private slots:
             QVERIFY2(healthy, "Real model failed to reach HTTP 200 within 90 seconds");
         }
         QVERIFY(!rpc(socket, "nonsense")["ok"].toBool());
+        const auto history = rpc(socket, "getRestartHistory", {{"profileId", id}});
+        QVERIFY(history["ok"].toBool()); QVERIFY(history["data"].toObject()["entries"].isArray());
+        QCOMPARE(status["health"].toString(), QString("Healthy"));
         QVERIFY(!rpc(socket, "deleteProfile", {{"profileId", id}})["ok"].toBool()); // active models cannot be deleted
         // A second model on another port runs alongside the first; a third on the same port is refused.
         auto p2 = profile(dir.path()); p2.name = "Second";

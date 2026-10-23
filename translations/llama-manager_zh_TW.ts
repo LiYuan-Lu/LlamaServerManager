@@ -64,6 +64,46 @@
         <source>  ·  up %1</source>
         <translation>  ·  已執行 %1</translation>
     </message>
+    <message>
+        <source>Restart %1/%2 in %3 s</source>
+        <translation>%3 秒後第 %1/%2 次重啟</translation>
+    </message>
+    <message>
+        <source>Restarting (attempt %1/%2)…</source>
+        <translation>重新啟動中（第 %1/%2 次）…</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>啟動中…</translation>
+    </message>
+    <message>
+        <source>Loading model…</source>
+        <translation>模型載入中…</translation>
+    </message>
+    <message>
+        <source>Healthy</source>
+        <translation>健康</translation>
+    </message>
+    <message>
+        <source>Auto restart off</source>
+        <translation>自動重啟已關閉</translation>
+    </message>
+    <message>
+        <source>Health checks off</source>
+        <translation>未啟用健康檢查</translation>
+    </message>
+    <message>
+        <source>Not running</source>
+        <translation>未執行</translation>
+    </message>
+    <message>
+        <source>Loading model (HTTP 503)</source>
+        <translation>模型載入中（HTTP 503）</translation>
+    </message>
+    <message>
+        <source>Waiting for /health</source>
+        <translation>等待 /health 回應</translation>
+    </message>
 </context>
 <context>
     <name>ModelPage</name>
@@ -100,8 +140,48 @@
         <translation>執行時間  %1</translation>
     </message>
     <message>
-        <source>RUNNING means the process has started; check the logs for model loading progress. HTTP health checks are not performed yet.</source>
-        <translation>RUNNING 表示程序已啟動；模型載入進度請查看日誌。目前尚未進行 HTTP 健康檢查。</translation>
+        <source>Health  %1</source>
+        <translation>健康狀態  %1</translation>
+    </message>
+    <message>
+        <source>Restarts  %1/%2</source>
+        <translation>重啟次數  %1/%2</translation>
+    </message>
+    <message>
+        <source>Automatic restarts within the restart window</source>
+        <translation>重啟時間窗內的自動重啟次數</translation>
+    </message>
+    <message>
+        <source>With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.</source>
+        <translation>啟用健康檢查時，模型會維持 STARTING，直到 GET /health 回傳 200 才變成 RUNNING。健康檢查失敗、程序當掉或啟動失敗時，會以遞增的等待時間自動重啟；按下停止一定會取消自動重啟。</translation>
+    </message>
+    <message>
+        <source>Console</source>
+        <translation>主控台</translation>
+    </message>
+    <message>
+        <source>Restart history (%1)</source>
+        <translation>重啟紀錄（%1）</translation>
+    </message>
+    <message>
+        <source>Healthy</source>
+        <translation>健康</translation>
+    </message>
+    <message>
+        <source>Health checks off</source>
+        <translation>未啟用健康檢查</translation>
+    </message>
+    <message>
+        <source>Not running</source>
+        <translation>未執行</translation>
+    </message>
+    <message>
+        <source>Loading model (HTTP 503)</source>
+        <translation>模型載入中（HTTP 503）</translation>
+    </message>
+    <message>
+        <source>Waiting for /health</source>
+        <translation>等待 /health 回應</translation>
     </message>
 </context>
 <context>
@@ -193,6 +273,109 @@
     <message>
         <source>Fill in the paths, then add the model to the list</source>
         <translation>填好路徑後，將模型加入清單</translation>
+    </message>
+    <message>
+        <source>Watchdog</source>
+        <translation>Watchdog</translation>
+    </message>
+    <message>
+        <source>Restart automatically after crashes, startup failures, and failed health checks</source>
+        <translation>程序當掉、啟動失敗或健康檢查失敗時自動重新啟動</translation>
+    </message>
+    <message>
+        <source>Check GET /health (STARTING lasts until it returns 200)</source>
+        <translation>檢查 GET /health（回傳 200 前維持 STARTING）</translation>
+    </message>
+    <message>
+        <source>Interval (s)</source>
+        <translation>間隔（秒）</translation>
+    </message>
+    <message>
+        <source>Timeout (s)</source>
+        <translation>逾時（秒）</translation>
+    </message>
+    <message>
+        <source>Failures before unhealthy</source>
+        <translation>判定異常的連續失敗次數</translation>
+    </message>
+    <message>
+        <source>Startup grace (s)</source>
+        <translation>載入寬限期（秒）</translation>
+    </message>
+    <message>
+        <source>Restart cooldown (s)</source>
+        <translation>重啟冷卻（秒）</translation>
+    </message>
+    <message>
+        <source>Max backoff (s)</source>
+        <translation>最長等待（秒）</translation>
+    </message>
+    <message>
+        <source>Max restarts</source>
+        <translation>最多重啟次數</translation>
+    </message>
+    <message>
+        <source>Within (s)</source>
+        <translation>時間窗（秒）</translation>
+    </message>
+</context>
+<context>
+    <name>RestartHistoryView</name>
+    <message>
+        <source>Crash</source>
+        <translation>程序當掉</translation>
+    </message>
+    <message>
+        <source>Startup failure</source>
+        <translation>啟動失敗</translation>
+    </message>
+    <message>
+        <source>Health check</source>
+        <translation>健康檢查失敗</translation>
+    </message>
+    <message>
+        <source>Recovered</source>
+        <translation>已復原</translation>
+    </message>
+    <message>
+        <source>Restart failed</source>
+        <translation>重啟失敗</translation>
+    </message>
+    <message>
+        <source>Restart pending</source>
+        <translation>等待重啟</translation>
+    </message>
+    <message>
+        <source>Gave up: restart limit reached</source>
+        <translation>已放棄：達到重啟上限</translation>
+    </message>
+    <message>
+        <source>Cancelled by manual stop</source>
+        <translation>已因手動停止取消</translation>
+    </message>
+    <message>
+        <source>Superseded by manual restart</source>
+        <translation>已由手動重啟取代</translation>
+    </message>
+    <message>
+        <source>Auto restart disabled</source>
+        <translation>未啟用自動重啟</translation>
+    </message>
+    <message>
+        <source>Interrupted by Agent restart</source>
+        <translation>因 Agent 重新啟動而中斷</translation>
+    </message>
+    <message>
+        <source>No failures recorded. Crashes, startup failures, and failed health checks will appear here.</source>
+        <translation>目前沒有故障紀錄。程序當掉、啟動失敗與健康檢查失敗會顯示在這裡。</translation>
+    </message>
+    <message>
+        <source>Attempt %1</source>
+        <translation>第 %1 次</translation>
+    </message>
+    <message>
+        <source>PID %1</source>
+        <translation>PID %1</translation>
     </message>
 </context>
 <context>
