@@ -10,6 +10,7 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QTimer>
+#include <algorithm>
 int main(int argc, char** argv)
 {
     QGuiApplication app(argc, argv);
@@ -32,15 +33,24 @@ int main(int argc, char** argv)
     }
     client.connectAgent();
     if (parser.isSet("smoke-test")) {
+        // Test hooks: LSM_SCREENSHOT saves the window after LSM_SCREENSHOT_DELAY_MS (default 700);
+        // LSM_SMOKE_OPEN opens that model's detail page first.
         const auto screenshot = qEnvironmentVariable("LSM_SCREENSHOT");
+        const int delay = qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") > 0 ? qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") : 700;
+        const auto open = qEnvironmentVariable("LSM_SMOKE_OPEN");
+        if (!open.isEmpty()) {
+            QTimer::singleShot(delay / 2, &app, [&engine, open] {
+                QMetaObject::invokeMethod(engine.rootObjects().first(), "openModel", Q_ARG(QVariant, open));
+            });
+        }
         if (!screenshot.isEmpty()) {
-            QTimer::singleShot(700, &app, [&engine, screenshot] {
+            QTimer::singleShot(delay, &app, [&engine, screenshot] {
                 if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first())) {
                     window->grabWindow().save(screenshot);
                 }
             });
         }
-        QTimer::singleShot(4000, &app, [&app, &client] {
+        QTimer::singleShot(std::max(4000, delay + 500), &app, [&app, &client] {
             const auto expected = qEnvironmentVariable("LSM_EXPECTED_PID");
             bool found = expected.isEmpty();
             const auto instances = client.instances();

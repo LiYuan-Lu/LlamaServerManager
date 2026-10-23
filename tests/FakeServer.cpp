@@ -16,6 +16,7 @@
 //   FAKE_HEALTH_HANG_AFTER_MS /health stops answering (connection stays open) after this long
 //   FAKE_ONCE_FILE            misbehave (FAKE_EXIT / FAKE_HEALTH_HANG_AFTER_MS) only on the run
 //                             that creates this file; later runs behave normally
+//   FAKE_LOG_LEVELS           print a few llama.cpp-like warning and error lines at start
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
@@ -79,6 +80,14 @@ int main(int argc, char** argv)
                         << "cwd=" << QDir::currentPath() << Qt::endl;
     QTextStream(stderr) << "fake stderr ready\n"
                         << Qt::flush;
+    if (qEnvironmentVariableIsSet("FAKE_LOG_LEVELS")) {
+        QTextStream(stderr) << "llama_model_loader: loaded meta data with 30 key-value pairs\n"
+                            << "W llama_context: n_ctx_per_seq (512) < n_ctx_train (32768) -- the full capacity of the model will not be utilized\n"
+                            << "warning: no usable GPU found, --gpu-layers option will be ignored\n"
+                            << "E srv  load_model: failed to load LoRA adapter 'missing.gguf'\n"
+                            << "main: server is listening on http://127.0.0.1\n"
+                            << Qt::flush;
+    }
     QTimer timer;
     QObject::connect(&timer, &QTimer::timeout, &app, [] { QTextStream(stdout) << "heartbeat 模型\n"
                                                                               << Qt::flush; });

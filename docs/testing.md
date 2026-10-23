@@ -103,3 +103,33 @@ Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1�
 - Windows 建置與 CTest（請執行上方「重現」的指令）。
 - Windows 上的 Stop 會先 terminate，3 秒後才 kill；因 health 失敗而重啟時，Windows 會比 Linux 多等約 3 秒。測試的逾時已預留空間，但尚未實際在 Windows 上跑過。
 - 真實 llama-server：載入期間的 503 → 200 轉換、長時間執行時 health 檢查的穩定性。
+
+# Phase 3 Dashboard 測試紀錄
+
+測試環境：Ubuntu 24.04、GCC 13.2（`-Wall -Wextra`）、Qt 6.4.2（`QT_QPA_PLATFORM=offscreen`）。與上一輪相同，僅為本機驗證暫時把 CMake 的 Qt 最低版本降為 6.4；交付的 CMakeLists.txt 仍要求 Qt 6.5。**以下結果皆未在 Windows 上執行，也沒有使用真實的 NVIDIA GPU。**
+
+## 已執行
+
+- 全部 targets 編譯成功，`-Wall -Wextra` 無警告。
+- 18 項中 17 項通過，連續 2 輪皆通過（`guiDetachedAgent` 只在 Windows 執行，已略過）。
+- 以 fake server 與假 NVML 建立 3 個模型（2 個執行中），截取英文（2 張假 GPU）與繁中（無 GPU）的主畫面與模型頁檢查：資源面板、GPU 選擇、無 GPU 時的說明、模型卡上的 CPU/RAM/VRAM、Console 的等級計數與上色。
+- 確認 Console 使用的隱藏 TextEdit 複製方式可寫入剪貼簿（qmltestrunner，offscreen）。
+
+## 新增 / 更新的自動測試
+
+| 測試 | 驗證 |
+| --- | --- |
+| systemMonitor | 第一次取樣 CPU 為 -1、系統 RAM 合理、本程序 RAM > 1 MiB、不存在的 PID 回報未執行、忙碌迴圈後 CPU > 0 且不超過單一邏輯處理器的比例、不再追蹤的 PID 會清除基準 |
+| gpuMonitor | 找不到 NVML 時不可用且有原因；假 NVML：2 張 GPU 的名稱、使用率、VRAM、溫度、功耗（不支援時為 -1）；同一張卡 compute 與 graphics 清單不重複計算、跨卡相加；驅動未提供時為 -1；無 GPU、初始化失敗時的原因 |
+| metricsCollector | 背景執行緒取樣、間隔限制在 1–10 秒、每個模型的 CPU/RAM/GPU 記憶體、已結束的程序、歷史資料格式；高速取樣下歷史仍不超過 600 點 |
+| agentMetricsAndSettings | 設定驗證（範圍、型別、未知欄位）、updateSettings 寫入 settings.json、`metrics` 事件含執行中模型的 PID 與用量、getMetrics 的歷史、Agent 重啟後設定保留 |
+| logModel | 等級判斷（含 `E `/`W ` 前綴與整字比對）、一筆紀錄拆成多行、搜尋（不分大小寫）、等級篩選、暫停時暫存新行、5,000 行上限（同步移除列與計數）、UTF-8 匯出與錯誤路徑；並用 QAbstractItemModelTester 檢查 model 的一致性 |
+| agentAndGuiReconnect | 原有的 GUI 冒煙測試現在也會載入資源面板與新的 Console，stderr 不得出現 QML 錯誤 |
+
+假 NVML（`tests/FakeNvml.cpp`）是真的共享函式庫，匯出與 nvml.dll 相同的函式名稱；`FAKE_NVML_MODE` 可切換 `ok`、`no-gpu`、`init-fail`。Agent 透過環境變數 `LSM_NVML_LIBRARY` 改用它（僅供測試）。GUI 的 `--smoke-test` 另外接受 `LSM_SCREENSHOT_DELAY_MS` 與 `LSM_SMOKE_OPEN=<profileId>`，用來截取模型頁。FakeServer 新增 `FAKE_LOG_LEVELS`，會輸出幾行類似 llama.cpp 的 warning / error。
+
+## 尚未驗證
+
+- Windows 建置（MSVC `/W4`）與 CTest。Windows 專用的程式碼路徑（`GetSystemTimes`、`GetProcessTimes`、`GetProcessMemoryInfo`、`GlobalMemoryStatusEx`、從系統路徑載入 nvml.dll）只寫好、尚未執行。
+- 真實 NVIDIA GPU 與驅動：實際的 NVML 數值、WDDM 下每個程序的 VRAM 是否如預期顯示 n/a、多張 GPU。
+- 原生 Windows 檔案對話框的「匯出…」互動，以及長時間執行下圖表的流暢度。

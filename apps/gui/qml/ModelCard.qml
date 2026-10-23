@@ -19,7 +19,7 @@ Rectangle {
         if (health.indexOf("Waiting for /health") === 0) return qsTr("Waiting for /health")
         return health
     }
-    implicitHeight: 176
+    implicitHeight: 196
     radius: 10
     color: hover.hovered ? "#243244" : "#1f2937"
     border.color: serverState === "RUNNING" ? "#065f46" : serverState === "FAILED" ? "#7f1d1d"
@@ -61,6 +61,7 @@ Rectangle {
                 + (card.serverState === "RUNNING" ? qsTr("  ·  up %1").arg(Theme.duration(card.info.uptimeSeconds)) : "")
             color: "#cbd5e1"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
         }
+        UsageLabel { profileId: card.profileId; Layout.fillWidth: true }
         Label {
             text: card.watchdogText
             visible: text.length > 0

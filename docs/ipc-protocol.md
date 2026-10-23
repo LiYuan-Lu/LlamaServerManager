@@ -36,6 +36,9 @@ Commands that act on one model take a `profileId` string. A missing or unknown `
 | stopServer | request.profileId; cancels a pending manual restart and stops that model's process; repeated stop is safe |
 | restartServer | request.profileId; stops and restarts in RUNNING/UNHEALTHY/RESTARTING/BACKOFF; acts as start in STOPPED/FAILED |
 | getRestartHistory | request.profileId; data: `profileId`, `entries` (up to 50 watchdog records, oldest first) |
+| getMetrics | data: `intervalSeconds`, `historySeconds` (300), `latest` (last sample, see below; empty before the first one), `history` (compact points, oldest first) |
+| getSettings | data.settings: `{metricsIntervalSeconds}` |
+| updateSettings | request.settings: fields to change (unknown fields are rejected); validated, saved to settings.json, applied, and broadcast as a `settings` event; data.settings: the new settings |
 
 Each element of `instances` contains: id, name, state, pid, port, model, uptimeSeconds, error, arguments, profile, and the watchdog fields health (summary text such as `Healthy`, `Loading model (HTTP 503)`, `Failing 2/3: ...`, `Disabled`, `Not running`), healthFailures, autoRestart, restartAttempt, maxRestarts, restartsInWindow, and nextRestartSeconds (0 unless a restart is scheduled).
 
@@ -43,9 +46,25 @@ Each element of `instances` contains: id, name, state, pid, port, model, uptimeS
 
 A restart history record contains time, profileId, pid, kind (`crash`, `startup`, `health`), reason, attempt, and outcome.
 
-A `status` event contains a complete snapshot (same shape as getStatus). A `log` event contains one record plus its `profileId`. A `history` event contains `profileId` and the full `entries` array of that model whenever its restart history changes. A `warning` event contains a message (and `profileId` when it concerns one model), such as a disk logging failure. Unknown commands return ok=false. Invalid JSON, incompatible versions, oversized frames, or invalid IDs cause disconnection. The later-phase command getMetrics is not implemented.
+A `status` event contains a complete snapshot (same shape as getStatus). A `log` event contains one record plus its `profileId`. A `history` event contains `profileId` and the full `entries` array of that model whenever its restart history changes. A `warning` event contains a message (and `profileId` when it concerns one model), such as a disk logging failure. A `metrics` event contains one sample (see below). A `settings` event contains `settings` after it changed. Unknown commands return ok=false. Invalid JSON, incompatible versions, oversized frames, or invalid IDs cause disconnection.
 
 A successful response means the command was accepted, not that the model has finished loading. Observe status and logs for the outcome. Disconnecting does not stop the service. On reconnection, the GUI must request getStatus (and getLogs for the model it is showing) rather than automatically replaying start/restart commands.
+
+## Metrics
+
+A sample (`metrics` event, `getMetrics.latest`):
+
+```json
+{"time":"2026-10-23T06:48:44.056Z","timeMs":1792738124056,"intervalSeconds":2,
+ "system":{"cpuPercent":3.8,"ramUsedBytes":576282624,"ramTotalBytes":8417529856,"logicalProcessors":16},
+ "gpu":{"available":true,"reason":"","devices":[{"index":0,"name":"NVIDIA GeForce RTX 4090","utilizationPercent":75,
+   "memoryUsedBytes":6442450944,"memoryTotalBytes":25769803776,"temperatureC":67,"powerWatts":215.5}]},
+ "processes":{"<profileId>":{"pid":2951,"running":true,"cpuPercent":0.3,"ramBytes":18034688,"gpuMemoryBytes":-1}}}
+```
+
+`-1` means not available (first sample for CPU values, a value the driver does not report, or no GPU). `processes` lists models whose process has a PID. Device values are for the whole GPU; `gpuMemoryBytes` is that process's own GPU memory (0 = not using a GPU). When `gpu.available` is false, `reason` says why.
+
+A history point: `{"time":<ms since epoch>,"cpu":<percent>,"ramUsed":<bytes>,"ramTotal":<bytes>,"gpus":[{"util":<percent>,"memUsed":<bytes>,"memTotal":<bytes>}]}`. The Agent keeps 5 minutes, at most 600 points.
 
 ## Profile fields
 

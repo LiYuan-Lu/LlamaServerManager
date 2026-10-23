@@ -1,10 +1,13 @@
 #pragma once
+#include "core/AppSettings.h"
 #include "core/LogStore.h"
+#include "core/MetricsCollector.h"
 #include "core/ProfileStore.h"
 #include "core/ServerSupervisor.h"
 #include <QHash>
 #include <QList>
 #include <QLocalServer>
+#include <memory>
 class AgentServer : public QObject {
     Q_OBJECT
 public:
@@ -30,6 +33,9 @@ private:
         StartServer,
         StopServer,
         RestartServer,
+        GetMetrics,
+        GetSettings,
+        UpdateSettings,
     };
     struct CommandSpec {
         Command command;
@@ -50,6 +56,8 @@ private:
     Reply updateProfile(Instance* instance, const QJsonObject& message);
     Reply deleteProfile(Instance* instance);
     Reply startServer(Instance* instance, bool restart);
+    Reply getMetrics() const;
+    Reply updateSettings(const QJsonObject& message);
     static bool parseProfile(const QJsonObject& message, Profile& profile, QString& error);
     // Broadcasts the new state after a profile change and returns it for the reply.
     QJsonObject publishSnapshot();
@@ -68,4 +76,7 @@ private:
     QList<Instance*> instances;
     QString loadWarning;
     QTimer ticker;
+    SettingsStore settingsStore;
+    AppSettings settings;
+    std::unique_ptr<MetricsCollector> metrics;
 };

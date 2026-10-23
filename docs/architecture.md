@@ -2,6 +2,8 @@
 
 GUI (`QGuiApplication`) → AgentClient → per-user QLocalSocket → AgentServer (`QCoreApplication`) → one Instance per profile (ServerSupervisor + LogStore) → LlamaProcessManager → QProcess → llama-server.
 
+AgentServer also owns a MetricsCollector (Phase 3), which samples system, GPU, and per-model process usage on its own thread and pushes `metrics` events; see phase3.md.
+
 ServerSupervisor is the per-model watchdog: it combines LlamaProcessManager with HealthMonitor (GET /health) and RestartPolicy, keeps the restart history, and owns the user-visible state. See phase2.md.
 
 Each saved profile is one model. The Agent creates an independent ServerSupervisor and LogStore (`logs/<profile-id>/`) for every profile, so models start, stop, restart, and fail independently. Profiles cannot be edited or deleted while their model is active. Before starting, the Agent rejects a port already used by another active model.
@@ -32,6 +34,6 @@ There is a short interval between process creation and job assignment. Descendan
 
 Newline-delimited JSON frames are limited to 1 MiB, and each socket's pending output is limited to 2 MiB. Slow clients exceeding the limit are disconnected while the model continues running. At most 16 GUI connections are accepted. Process output is split into chunks of at most 4,096 bytes; streaming UTF-8 decoders preserve characters split across reads. Memory and disk retention are bounded. Disk write or rotation failures generate warnings without stopping the model.
 
-Profiles are validated before atomic writes. Reading a corrupt file does not immediately overwrite it. The GUI retries connection asynchronously every 1.5 seconds and attempts to launch the Agent at most once every 10 seconds. Requests time out after 15 seconds. Commands that can change state are not retried automatically. The Agent pushes status every second.
+Profiles are validated before atomic writes. Reading a corrupt file does not immediately overwrite it. The GUI retries connection asynchronously every 1.5 seconds and attempts to launch the Agent at most once every 10 seconds. Requests time out after 15 seconds. Commands that can change state are not retried automatically. The Agent pushes status every second and metrics every `metricsIntervalSeconds` (default 2).
 
 The Qt main-thread event-driven QProcess/IPC paths do not use waitForStarted or waitForFinished. Bounded blocking cleanup is used only during Agent destruction; tests may also wait. Disk operations are short synchronous local JSON/log writes. This MVP does not have a background write queue for slow network storage; keep the production data directory on a local disk.

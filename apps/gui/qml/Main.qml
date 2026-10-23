@@ -71,23 +71,29 @@ ApplicationWindow {
         ScrollView {
             id: scroll
             contentWidth: availableWidth
-            contentHeight: flow.height
-            Flow {
-                id: flow
+            contentHeight: content.height
+            Column {
+                id: content
                 width: scroll.availableWidth
-                spacing: 14
-                readonly property int columns: Math.max(1, Math.floor((width + spacing) / (300 + spacing)))
-                readonly property real cardWidth: Math.max(240, Math.floor((width - spacing * (columns - 1)) / columns))
-                Repeater {
-                    model: agent.instanceIds
-                    ModelCard { width: flow.cardWidth; profileId: modelData; onOpen: root.openModel(modelData) }
-                }
-                AddCard { width: flow.cardWidth; onClicked: root.openModel("") }
-                Label {
-                    visible: agent.synchronized && agent.instanceIds.length === 0
-                    width: flow.width
-                    text: qsTr("No models yet. Click + to add your first model.")
-                    color: "#94a3b8"
+                spacing: 18
+                ResourcePanel { width: content.width }
+                Flow {
+                    id: flow
+                    width: content.width
+                    spacing: 14
+                    readonly property int columns: Math.max(1, Math.floor((width + spacing) / (300 + spacing)))
+                    readonly property real cardWidth: Math.max(240, Math.floor((width - spacing * (columns - 1)) / columns))
+                    Repeater {
+                        model: agent.instanceIds
+                        ModelCard { width: flow.cardWidth; profileId: modelData; onOpen: root.openModel(modelData) }
+                    }
+                    AddCard { width: flow.cardWidth; onClicked: root.openModel("") }
+                    Label {
+                        visible: agent.synchronized && agent.instanceIds.length === 0
+                        width: flow.width
+                        text: qsTr("No models yet. Click + to add your first model.")
+                        color: "#94a3b8"
+                    }
                 }
             }
         }

@@ -1,4 +1,5 @@
 #pragma once
+#include "LogModel.h"
 #include <QHash>
 #include <QJsonObject>
 #include <QLocalSocket>
@@ -17,9 +18,14 @@ class AgentClient : public QObject {
     // id -> {id, name, state, pid, uptimeSeconds, error, profile, busy, ...}
     Q_PROPERTY(QVariantMap instances READ instances NOTIFY instancesChanged)
     Q_PROPERTY(QString warning READ warning NOTIFY instancesChanged)
-    // The model whose console is shown in logText.
+    // The model whose console is shown in logModel.
     Q_PROPERTY(QString selectedId READ selectedId WRITE setSelectedId NOTIFY selectedIdChanged)
-    Q_PROPERTY(QString logText READ logText NOTIFY logsChanged)
+    Q_PROPERTY(LogModel* logModel READ logModel CONSTANT)
+    // Latest resource sample: {time, intervalSeconds, system, gpu, processes}; empty until received.
+    Q_PROPERTY(QVariantMap metrics READ metrics NOTIFY metricsChanged)
+    // Last 5 minutes: [{time, cpu, ramUsed, ramTotal, gpus: [{util, memUsed, memTotal}]}], oldest first.
+    Q_PROPERTY(QVariantList metricsHistory READ metricsHistory NOTIFY metricsChanged)
+    Q_PROPERTY(int metricsInterval READ metricsInterval NOTIFY metricsIntervalChanged)
     // Watchdog restart history of the selected model, newest last.
     Q_PROPERTY(QVariantList restartHistory READ restartHistory NOTIFY restartHistoryChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -34,7 +40,10 @@ public:
     QString warning() const { return agentWarning; }
     QString selectedId() const { return selected; }
     void setSelectedId(const QString& id);
-    QString logText() const { return logs.value(selected).text; }
+    LogModel* logModel() { return &console; }
+    QVariantMap metrics() const { return latestMetrics; }
+    QVariantList metricsHistory() const { return history5m; }
+    int metricsInterval() const { return interval; }
     QVariantList restartHistory() const { return history; }
     QString error() const { return lastError; }
     bool busy() const { return !pending.isEmpty(); }
@@ -46,7 +55,9 @@ public:
     Q_INVOKABLE void saveProfile(const QString& profileId, const QVariantMap& profile);
     Q_INVOKABLE void deleteProfile(const QString& profileId);
     Q_INVOKABLE QString localPath(const QUrl& url) const;
+    // Clears the console view of the selected model; log files on disk are kept.
     Q_INVOKABLE void clearLogs();
+    Q_INVOKABLE void setMetricsInterval(int seconds);
     Q_INVOKABLE void clearError() { setError({ }); }
 signals:
     void connectedChanged();
@@ -55,7 +66,8 @@ signals:
     void selectedIdChanged();
     void profileChanged(const QString& profileId);
     void profileCreated(const QString& profileId);
-    void logsChanged();
+    void metricsChanged();
+    void metricsIntervalChanged();
     void restartHistoryChanged();
     void errorChanged();
     void busyChanged();
@@ -66,7 +78,7 @@ private:
         qint64 time = 0;
     };
     struct Log {
-        QString text;
+        QVector<LogModel::Line> lines;
         qint64 sequence = 0;
     };
     void send(const QString& command, const QJsonObject& extra = { });
@@ -75,6 +87,9 @@ private:
     void rebuild();
     void appendLog(const QString& profileId, const QJsonObject& data, bool notify = true);
     void setError(const QString& error);
+    void applyMetrics(const QJsonObject& sample);
+    void resetMetrics(const QJsonObject& data);
+    void clearMetrics();
     QString directory;
     bool autoLaunch;
     QLocalSocket socket;
@@ -85,6 +100,10 @@ private:
     QVariantMap raw, view;
     QHash<QString, QVariantMap> profiles;
     QHash<QString, Log> logs;
+    LogModel console;
+    QVariantMap latestMetrics;
+    QVariantList history5m;
+    int interval = 0;
     QVariantList history;
     QString selected, agentWarning, lastError;
     qint64 lastLaunch = 0;

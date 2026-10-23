@@ -1,9 +1,14 @@
+#include "core/AppSettings.h"
+#include "core/GpuMonitor.h"
 #include "core/HealthMonitor.h"
 #include "core/LlamaProcessManager.h"
 #include "core/LogStore.h"
+#include "core/MetricsCollector.h"
 #include "core/ProfileStore.h"
 #include "core/RestartPolicy.h"
 #include "core/ServerSupervisor.h"
+#include "core/SystemMonitor.h"
+#include "ipc/LogModel.h"
 #include "ipc/Protocol.h"
 #include <QFile>
 #include <QJsonArray>
@@ -137,6 +142,42 @@ class Tests : public QObject {
         }
         int port() const { return server.serverPort(); }
     };
+    // Keeps the CPU busy so CPU usage differences are measurable.
+    static void spin(int ms)
+    {
+        QElapsedTimer t;
+        t.start();
+        volatile double x = 0;
+        while (t.elapsed() < ms) {
+            x = x + 1.0;
+        }
+    }
+    struct EnvironmentVariable {
+        QByteArray name;
+        EnvironmentVariable(const char* key, const QByteArray& value)
+            : name(key)
+        {
+            qputenv(key, value);
+        }
+        ~EnvironmentVariable() { qunsetenv(name.constData()); }
+    };
+    QJsonObject waitForEvent(QLocalSocket& socket, const QString& event, int timeoutMs)
+    {
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < timeoutMs) {
+            if (!socket.canReadLine()) {
+                socket.waitForReadyRead(100);
+            }
+            while (socket.canReadLine()) {
+                const auto m = QJsonDocument::fromJson(socket.readLine()).object();
+                if (m["event"].toString() == event) {
+                    return m["data"].toObject();
+                }
+            }
+        }
+        return { };
+    }
     QStringList outcomes(const QJsonArray& history)
     {
         QStringList list;
@@ -576,6 +617,293 @@ private slots:
         QVERIFY(manager.start(p).isEmpty());
         QTRY_COMPARE_WITH_TIMEOUT(manager.status()["state"].toString(), "FAILED", 12000);
         QVERIFY(manager.status()["error"].toString().contains("timed out"));
+    }
+    void systemMonitor()
+    {
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+        SystemMonitor monitor;
+        const auto first = monitor.sampleSystem();
+        QCOMPARE(first.cpuPercent, -1.0); // needs two samples
+        QVERIFY(first.ramTotalBytes > 0);
+        QVERIFY(first.ramUsedBytes > 0 && first.ramUsedBytes <= first.ramTotalBytes);
+        const qint64 self = QCoreApplication::applicationPid();
+        const qint64 missing = 0x7ffffff0;
+        auto processes = monitor.sampleProcesses({ self, missing, 0 });
+        QCOMPARE(processes.size(), 3);
+        QVERIFY(processes[0].running);
+        QVERIFY(processes[0].ramBytes > 1024 * 1024);
+        QCOMPARE(processes[0].cpuPercent, -1.0);
+        QVERIFY(!processes[1].running);
+        QCOMPARE(processes[1].ramBytes, -1);
+        QVERIFY(!processes[2].running);
+        spin(300);
+        const auto second = monitor.sampleSystem();
+        QVERIFY(second.cpuPercent >= 0 && second.cpuPercent <= 100);
+        processes = monitor.sampleProcesses({ self });
+        QVERIFY(processes[0].cpuPercent > 0 && processes[0].cpuPercent <= 100);
+        // One busy thread uses at most one logical processor's share of the machine.
+        QVERIFY2(processes[0].cpuPercent <= 100.0 / SystemMonitor::logicalProcessors() * 1.5 + 1, qPrintable(QString::number(processes[0].cpuPercent)));
+        // A process that is no longer requested loses its baseline.
+        monitor.sampleProcesses({ });
+        QCOMPARE(monitor.sampleProcesses({ self })[0].cpuPercent, -1.0);
+#else
+        QSKIP("Resource monitoring is implemented for Windows and Linux");
+#endif
+    }
+    void gpuMonitor()
+    {
+        {
+            GpuMonitor missing(QDir::currentPath() + "/no-such-nvml-library");
+            QVERIFY(!missing.available());
+            QVERIFY(!missing.unavailableReason().isEmpty());
+            const auto sample = missing.sample();
+            QVERIFY(!sample.available);
+            QVERIFY(sample.devices.isEmpty());
+            QCOMPARE(sample.reason, missing.unavailableReason());
+        }
+        const QString library = LSM_FAKE_NVML;
+        const qint64 self = QCoreApplication::applicationPid();
+        EnvironmentVariable pid("FAKE_NVML_PID", QByteArray::number(self));
+        {
+            EnvironmentVariable mode("FAKE_NVML_MODE", "ok");
+            GpuMonitor gpu(library);
+            QVERIFY2(gpu.available(), qPrintable(gpu.unavailableReason()));
+            const auto sample = gpu.sample();
+            QVERIFY(sample.available);
+            QCOMPARE(sample.devices.size(), 2);
+            const auto& d0 = sample.devices[0];
+            const qint64 GiB = 1024LL * 1024 * 1024;
+            QCOMPARE(d0.name, QString("Fake RTX 0"));
+            QCOMPARE(d0.utilizationPercent, 75);
+            QCOMPARE(d0.memoryUsedBytes, 6 * GiB);
+            QCOMPARE(d0.memoryTotalBytes, 24 * GiB);
+            QCOMPARE(d0.temperatureC, 67);
+            QCOMPARE(d0.powerWatts, 215.5);
+            QCOMPARE(sample.devices[1].index, 1);
+            QCOMPARE(sample.devices[1].powerWatts, -1.0); // not supported by that GPU
+            // Compute and graphics entries of one GPU are not double counted; GPUs add up.
+            QCOMPARE(sample.processMemory.value(self), GiB + GiB / 2);
+            // The driver did not report this process's memory: unknown, not zero.
+            QCOMPARE(sample.processMemory.value(4242, 0), -1);
+            QVERIFY(!sample.processMemory.contains(1));
+        }
+        {
+            EnvironmentVariable mode("FAKE_NVML_MODE", "no-gpu");
+            GpuMonitor gpu(library);
+            QVERIFY(!gpu.available());
+            QCOMPARE(gpu.unavailableReason(), QString("No NVIDIA GPU found"));
+        }
+        {
+            EnvironmentVariable mode("FAKE_NVML_MODE", "init-fail");
+            GpuMonitor gpu(library);
+            QVERIFY(!gpu.available());
+            QVERIFY(gpu.unavailableReason().contains("Driver Not Loaded"));
+            QVERIFY(!gpu.sample().available);
+        }
+    }
+    void metricsCollector()
+    {
+        const qint64 self = QCoreApplication::applicationPid();
+        EnvironmentVariable pid("FAKE_NVML_PID", QByteArray::number(self));
+        EnvironmentVariable mode("FAKE_NVML_MODE", "ok");
+        MetricsCollector collector([self] { return QList<MetricsCollector::Target> { { "self", self }, { "gone", 0x7ffffff0 } }; }, LSM_FAKE_NVML);
+        collector.setIntervalSeconds(0);
+        QCOMPARE(collector.intervalSeconds(), MetricsCollector::MinIntervalSeconds);
+        collector.setIntervalSeconds(99);
+        QCOMPARE(collector.intervalSeconds(), MetricsCollector::MaxIntervalSeconds);
+        collector.setIntervalSeconds(1);
+        collector.setTimeScale(50); // 1 configured second = 50 ms
+        QSignalSpy spy(&collector, &MetricsCollector::sampled);
+        collector.start();
+        QTRY_VERIFY_WITH_TIMEOUT(spy.size() >= 3, 5000);
+        const auto latest = collector.latest();
+        QCOMPARE(latest["intervalSeconds"].toInt(), 1);
+        const auto system = latest["system"].toObject();
+        QVERIFY(system["cpuPercent"].toDouble() >= 0);
+        QVERIFY(system["ramTotalBytes"].toInteger() > 0);
+        const auto gpu = latest["gpu"].toObject();
+        QVERIFY(gpu["available"].toBool());
+        QCOMPARE(gpu["devices"].toArray().size(), 2);
+        const auto processes = latest["processes"].toObject();
+        const auto mine = processes["self"].toObject();
+        QVERIFY(mine["running"].toBool());
+        QCOMPARE(mine["pid"].toInteger(), self);
+        QVERIFY(mine["cpuPercent"].toDouble() >= 0);
+        QVERIFY(mine["ramBytes"].toInteger() > 0);
+        QCOMPARE(mine["gpuMemoryBytes"].toInteger(), 1024LL * 1024 * 1024 * 3 / 2);
+        const auto gone = processes["gone"].toObject();
+        QVERIFY(!gone["running"].toBool());
+        QCOMPARE(gone["gpuMemoryBytes"].toInteger(), -1);
+        const auto history = collector.history();
+        QVERIFY(history.size() >= 3);
+        const auto point = history.last().toObject();
+        QVERIFY(point["time"].toInteger() > 0);
+        QCOMPARE(point["gpus"].toArray().size(), 2);
+        QCOMPARE(point["gpus"].toArray()[0].toObject()["util"].toInt(), 75);
+        // The history stays bounded however fast samples arrive.
+        collector.setTimeScale(1);
+        QTRY_VERIFY_WITH_TIMEOUT(spy.size() > MetricsCollector::MaxHistoryPoints + 20, 20000);
+        QVERIFY(collector.history().size() <= MetricsCollector::MaxHistoryPoints);
+    }
+    void agentMetricsAndSettings()
+    {
+        AppSettings parsed;
+        QString error;
+        QVERIFY(AppSettings::fromJson({ }, parsed, error));
+        QCOMPARE(parsed.metricsIntervalSeconds, 2);
+        QVERIFY(!AppSettings::fromJson({ { "metricsIntervalSeconds", 0 } }, parsed, error));
+        QVERIFY(!AppSettings::fromJson({ { "metricsIntervalSeconds", 1.5 } }, parsed, error));
+        QVERIFY(!AppSettings::fromJson({ { "metricsIntervalSeconds", "1" } }, parsed, error));
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        QProcess agent;
+        auto environment = QProcessEnvironment::systemEnvironment();
+        environment.insert("LSM_NVML_LIBRARY", LSM_FAKE_NVML);
+        environment.insert("FAKE_NVML_MODE", "ok");
+        agent.setProcessEnvironment(environment);
+        agent.start(binary("llama-manager-agent"), { "--data-dir", dir.path() });
+        QVERIFY(agent.waitForStarted());
+        struct Cleanup {
+            QProcess& p;
+            ~Cleanup()
+            {
+                p.kill();
+                p.waitForFinished(5000);
+            }
+        } cleanup { agent };
+        QLocalSocket socket;
+        QTRY_VERIFY_WITH_TIMEOUT(([&] {
+            if (socket.state() == QLocalSocket::UnconnectedState) {
+                socket.connectToServer(Protocol::endpoint(dir.path()));
+            }
+            return socket.waitForConnected(100);
+        })(),
+            10000);
+        auto settings = rpc(socket, "getSettings");
+        QVERIFY(settings["ok"].toBool());
+        QCOMPARE(settings["data"].toObject()["settings"].toObject()["metricsIntervalSeconds"].toInt(), 2);
+        QVERIFY(!rpc(socket, "updateSettings")["ok"].toBool());
+        QVERIFY(!rpc(socket, "updateSettings", { { "settings", QJsonObject { { "metricsIntervalSeconds", 11 } } } })["ok"].toBool());
+        QVERIFY(!rpc(socket, "updateSettings", { { "settings", QJsonObject { { "bogus", 1 } } } })["ok"].toBool());
+        settings = rpc(socket, "updateSettings", { { "settings", QJsonObject { { "metricsIntervalSeconds", 1 } } } });
+        QVERIFY2(settings["ok"].toBool(), qPrintable(settings["error"].toString()));
+        QCOMPARE(settings["data"].toObject()["settings"].toObject()["metricsIntervalSeconds"].toInt(), 1);
+        QFile saved(dir.path() + "/settings.json");
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(saved.readAll()).object()["settings"].toObject()["metricsIntervalSeconds"].toInt(), 1);
+        // A running model shows up in the per-process metrics under its profile ID.
+        const auto created = rpc(socket, "createProfile", { { "profile", profile(dir.path()).toJson() } });
+        const auto id = created["data"].toObject()["id"].toString();
+        QVERIFY(rpc(socket, "startServer", { { "profileId", id } })["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id)["state"].toString(), "RUNNING", 10000);
+        const auto pid = instance(socket, id)["pid"].toInteger();
+        QJsonObject event;
+        QTRY_VERIFY_WITH_TIMEOUT(([&] {
+            event = waitForEvent(socket, "metrics", 1500);
+            return event["processes"].toObject()[id].toObject()["cpuPercent"].toDouble() >= 0;
+        })(),
+            10000);
+        QCOMPARE(event["intervalSeconds"].toInt(), 1);
+        const auto process = event["processes"].toObject()[id].toObject();
+        QCOMPARE(process["pid"].toInteger(), pid);
+        QVERIFY(process["running"].toBool());
+        QVERIFY(process["ramBytes"].toInteger() > 0);
+        QCOMPARE(process["gpuMemoryBytes"].toInteger(), 0); // the fake GPU does not list this process
+        QVERIFY(event["gpu"].toObject()["available"].toBool());
+        const auto metrics = rpc(socket, "getMetrics");
+        QVERIFY(metrics["ok"].toBool());
+        const auto data = metrics["data"].toObject();
+        QCOMPARE(data["historySeconds"].toInt(), MetricsCollector::HistorySeconds);
+        QVERIFY(data["history"].toArray().size() >= 2);
+        QVERIFY(data["latest"].toObject()["system"].isObject());
+        QVERIFY(rpc(socket, "stopServer", { { "profileId", id } })["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id)["state"].toString(), "STOPPED", 6000);
+        // The setting survives an Agent restart.
+        socket.abort();
+        agent.kill();
+        agent.waitForFinished(5000);
+        agent.start(binary("llama-manager-agent"), { "--data-dir", dir.path() });
+        QVERIFY(agent.waitForStarted());
+        QTRY_VERIFY_WITH_TIMEOUT(([&] {
+            if (socket.state() == QLocalSocket::UnconnectedState) {
+                socket.connectToServer(Protocol::endpoint(dir.path()));
+            }
+            return socket.waitForConnected(100);
+        })(),
+            10000);
+        QCOMPARE(rpc(socket, "getMetrics")["data"].toObject()["intervalSeconds"].toInt(), 1);
+    }
+    void logModel()
+    {
+        using Level = LogModel::Level;
+        QCOMPARE(LogModel::classify("stderr", "llama_model_load: error loading model"), Level::Error);
+        QCOMPARE(LogModel::classify("stderr", "E srv  load_model: cannot open"), Level::Error);
+        QCOMPARE(LogModel::classify("agent", "FAILED: Process exited unexpectedly"), Level::Error);
+        QCOMPARE(LogModel::classify("stderr", "W llama_context: n_ctx_per_seq < n_ctx_train"), Level::Warning);
+        QCOMPARE(LogModel::classify("stderr", "warning: no usable GPU found"), Level::Warning);
+        QCOMPARE(LogModel::classify("stderr", "load_tensors: offloaded 33/33 layers to GPU"), Level::Info);
+        QCOMPARE(LogModel::classify("stdout", "terror is not a level"), Level::Info); // whole words only
+        // One record may hold several lines; a trailing newline does not add an empty line.
+        const auto lines = LogModel::parse({ { "sequence", 7 }, { "time", "2026-10-23T02:00:00.000Z" }, { "channel", "stderr" }, { "text", "one\r\nwarning: two\nthree" } });
+        QCOMPARE(lines.size(), 3);
+        QCOMPARE(lines[0].text, QString("one"));
+        QCOMPARE(lines[1].level, Level::Warning);
+        QCOMPARE(lines[2].sequence, 7);
+        QCOMPARE(LogModel::parse({ { "text", "only\n" } }).size(), 1);
+
+        LogModel model;
+        QAbstractItemModelTester tester(&model);
+        auto line = [](const QString& text) { return LogModel::Line { 0, "2026-10-23T02:00:00.000Z", "stderr", text, LogModel::classify("stderr", text) }; };
+        model.reset({ line("starting"), line("error: bad"), line("warning: slow"), line("Loaded MODEL") });
+        QCOMPARE(model.rowCount(), 4);
+        QCOMPARE(model.errorCount(), 1);
+        QCOMPARE(model.warningCount(), 1);
+        QCOMPARE(model.infoCount(), 2);
+        QCOMPARE(model.data(model.index(1, 0), LogModel::LevelRole).toString(), QString("error"));
+        model.setFilterText("model");
+        QCOMPARE(model.rowCount(), 1); // case-insensitive search
+        QCOMPARE(model.data(model.index(0, 0), LogModel::TextRole).toString(), QString("Loaded MODEL"));
+        model.setFilterText("");
+        model.setShowInfo(false);
+        QCOMPARE(model.rowCount(), 2);
+        QCOMPARE(model.text(true).count('\n'), 2);
+        QCOMPARE(model.text(false).count('\n'), 4);
+        // Paused: new lines are held back and not shown until resumed.
+        model.setPaused(true);
+        model.append({ line("error: during pause") });
+        QCOMPARE(model.rowCount(), 2);
+        QCOMPARE(model.heldCount(), 1);
+        model.setPaused(false);
+        QCOMPARE(model.heldCount(), 0);
+        QCOMPARE(model.rowCount(), 3);
+        QCOMPARE(model.errorCount(), 2);
+        // Bounded: the oldest lines are dropped, together with their rows and counts.
+        model.setShowInfo(true);
+        QVector<LogModel::Line> many;
+        for (int i = 0; i < LogModel::MaxLines; ++i) {
+            many << line(QString("line %1").arg(i));
+        }
+        model.append(many);
+        QCOMPARE(model.totalCount(), LogModel::MaxLines);
+        QCOMPARE(model.rowCount(), LogModel::MaxLines);
+        QCOMPARE(model.errorCount() + model.warningCount() + model.infoCount(), LogModel::MaxLines);
+        QCOMPARE(model.data(model.index(0, 0), LogModel::TextRole).toString(), QString("line 0"));
+        model.append({ line("error: newest") });
+        QCOMPARE(model.totalCount(), LogModel::MaxLines);
+        QCOMPARE(model.data(model.index(0, 0), LogModel::TextRole).toString(), QString("line 1"));
+        QCOMPARE(model.errorCount(), 1);
+        // Export writes the matching lines as UTF-8.
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        model.setFilterText("newest");
+        const auto file = QUrl::fromLocalFile(dir.path() + "/模型 log.txt");
+        QCOMPARE(model.exportTo(file, true), QString());
+        QFile exported(file.toLocalFile());
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(exported.readAll()), QString("2026-10-23T02:00:00.000Z [stderr] error: newest\n"));
+        QVERIFY(!model.exportTo(QUrl::fromLocalFile(dir.path() + "/missing/dir/x.txt"), true).isEmpty());
+        model.reset({ });
+        QCOMPARE(model.rowCount(), 0);
+        QCOMPARE(model.errorCount(), 0);
     }
     void agentAndGuiReconnect()
     {

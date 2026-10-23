@@ -78,6 +78,7 @@ Item {
                 }
             }
         }
+        UsageLabel { profileId: page.profileId; Layout.fillWidth: true }
         Label {
             visible: !page.isNew
             text: qsTr("With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.")
@@ -90,7 +91,7 @@ Item {
         SplitView {
             orientation: Qt.Vertical; Layout.fillWidth: true; Layout.fillHeight: true
             ScrollView {
-                SplitView.preferredHeight: page.isNew ? 10000 : 470; SplitView.minimumHeight: 120
+                SplitView.preferredHeight: page.isNew ? 10000 : 300; SplitView.minimumHeight: 120
                 contentWidth: availableWidth
                 ProfileEditor {
                     id: editor; width: parent.width
@@ -99,7 +100,7 @@ Item {
                 }
             }
             ColumnLayout {
-                visible: !page.isNew; SplitView.fillHeight: true; SplitView.minimumHeight: 150; spacing: 6
+                visible: !page.isNew; SplitView.fillHeight: true; SplitView.minimumHeight: 220; spacing: 6
                 TabBar {
                     id: tabs
                     TabButton { text: qsTr("Console"); width: implicitWidth + 24 }

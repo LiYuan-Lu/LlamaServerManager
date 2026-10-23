@@ -5,7 +5,7 @@ import QtQuick.Layouts
 Rectangle {
     id: card
     signal clicked()
-    implicitHeight: 176
+    implicitHeight: 196
     radius: 10
     color: hover.hovered ? "#1e293b" : "transparent"
     border.color: hover.hovered ? "#60a5fa" : "#475569"

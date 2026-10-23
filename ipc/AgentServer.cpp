@@ -7,9 +7,15 @@ AgentServer::AgentServer(const QString& dir, QObject* parent)
     : QObject(parent)
     , directory(dir)
     , store(dir)
+    , settingsStore(dir)
 {
     bool changed = false;
     const auto loaded = store.load(loadWarning, &changed);
+    QString settingsWarning;
+    settings = settingsStore.load(settingsWarning);
+    if (!settingsWarning.isEmpty()) {
+        loadWarning += (loadWarning.isEmpty() ? "" : "; ") + settingsWarning;
+    }
     for (const auto& p : loaded) {
         add(p);
     }
@@ -36,6 +42,21 @@ AgentServer::AgentServer(const QString& dir, QObject* parent)
     ticker.setInterval(1000);
     connect(&ticker, &QTimer::timeout, this, [this] { broadcast("status", snapshot()); });
     ticker.start();
+    // LSM_NVML_LIBRARY overrides the NVML location (tests use a fake library).
+    metrics = std::make_unique<MetricsCollector>([this] {
+        QList<MetricsCollector::Target> targets;
+        for (const auto* instance : instances) {
+            const auto pid = instance->manager->status()["pid"].toInteger();
+            if (pid > 0) {
+                targets.append({ instance->profile.id, pid });
+            }
+        }
+        return targets;
+    },
+        qEnvironmentVariable("LSM_NVML_LIBRARY"));
+    metrics->setIntervalSeconds(settings.metricsIntervalSeconds);
+    connect(metrics.get(), &MetricsCollector::sampled, this, [this](const QJsonObject& sample) { broadcast("metrics", sample); });
+    metrics->start();
 }
 bool AgentServer::listen(QString& error)
 {
@@ -50,6 +71,8 @@ bool AgentServer::listen(QString& error)
 }
 AgentServer::~AgentServer()
 {
+    // Stops the sampling thread before the instances it reads are destroyed.
+    metrics.reset();
     disconnect(&server, nullptr, this, nullptr);
     for (auto* socket : clients.keys()) {
         disconnect(socket, nullptr, this, nullptr);
@@ -179,6 +202,9 @@ const QHash<QString, AgentServer::CommandSpec>& AgentServer::commands()
         { "startServer", { Command::StartServer, true } },
         { "stopServer", { Command::StopServer, true } },
         { "restartServer", { Command::RestartServer, true } },
+        { "getMetrics", { Command::GetMetrics, false } },
+        { "getSettings", { Command::GetSettings, false } },
+        { "updateSettings", { Command::UpdateSettings, false } },
     };
     return table;
 }
@@ -228,6 +254,12 @@ AgentServer::Reply AgentServer::execute(const QJsonObject& m)
         return startServer(instance, true);
     case Command::StopServer:
         return Reply { instance->manager->stop(), { } };
+    case Command::GetMetrics:
+        return getMetrics();
+    case Command::GetSettings:
+        return Reply::success({ { "settings", settings.toJson() } });
+    case Command::UpdateSettings:
+        return updateSettings(m);
     }
     return Reply::failure("Unhandled command: " + name); // every enum value is handled above
 }
@@ -320,4 +352,38 @@ AgentServer::Reply AgentServer::startServer(Instance* instance, bool restart)
     }
     auto* supervisor = instance->manager;
     return Reply { restart ? supervisor->restart(instance->profile) : supervisor->start(instance->profile), { } };
+}
+AgentServer::Reply AgentServer::getMetrics() const
+{
+    return Reply::success({
+        { "intervalSeconds", metrics->intervalSeconds() },
+        { "historySeconds", MetricsCollector::HistorySeconds },
+        { "latest", metrics->latest() },
+        { "history", metrics->history() },
+    });
+}
+AgentServer::Reply AgentServer::updateSettings(const QJsonObject& m)
+{
+    if (!m["settings"].isObject()) {
+        return Reply::failure("Missing settings object");
+    }
+    // Fields that are not sent keep their current values.
+    auto merged = settings.toJson();
+    const auto changes = m["settings"].toObject();
+    for (auto i = changes.begin(); i != changes.end(); ++i) {
+        if (!merged.contains(i.key())) {
+            return Reply::failure("Unknown setting: " + i.key());
+        }
+        merged[i.key()] = i.value();
+    }
+    AppSettings candidate;
+    QString error;
+    if (!AppSettings::fromJson(merged, candidate, error) || !settingsStore.save(candidate, error)) {
+        return Reply::failure(error);
+    }
+    settings = candidate;
+    metrics->setIntervalSeconds(settings.metricsIntervalSeconds);
+    const QJsonObject data { { "settings", settings.toJson() } };
+    broadcast("settings", data);
+    return Reply::success(data);
 }

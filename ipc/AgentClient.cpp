@@ -1,5 +1,6 @@
 #include "AgentClient.h"
 #include "Protocol.h"
+#include "core/MetricsCollector.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
@@ -21,11 +22,12 @@ AgentClient::AgentClient(QString dir, bool launch, QObject* parent)
     connect(&socket, &QLocalSocket::connected, this, [this] {
         buffer.clear();
         logs.clear();
+        console.reset({ });
         synced = false;
-        emit logsChanged();
         setError({ });
         emit connectedChanged();
         send("getStatus");
+        send("getMetrics");
         if (!selected.isEmpty()) {
             send("getLogs", { { "profileId", selected } });
             send("getRestartHistory", { { "profileId", selected } });
@@ -35,6 +37,7 @@ AgentClient::AgentClient(QString dir, bool launch, QObject* parent)
         pending.clear();
         buffer.clear();
         synced = false;
+        clearMetrics();
         rebuild();
         emit busyChanged();
         emit connectedChanged();
@@ -165,9 +168,43 @@ QString AgentClient::localPath(const QUrl& url) const { return url.toLocalFile()
 void AgentClient::clearLogs()
 {
     if (logs.contains(selected)) {
-        logs[selected].text.clear();
-        emit logsChanged();
+        logs[selected].lines.clear();
     }
+    console.reset({ });
+}
+void AgentClient::setMetricsInterval(int seconds)
+{
+    setError({ });
+    send("updateSettings", { { "settings", QJsonObject { { "metricsIntervalSeconds", seconds } } } });
+}
+void AgentClient::clearMetrics()
+{
+    latestMetrics.clear();
+    history5m.clear();
+    emit metricsChanged();
+}
+void AgentClient::applyMetrics(const QJsonObject& sample)
+{
+    latestMetrics = sample.toVariantMap();
+    history5m.append(MetricsCollector::compact(sample).toVariantMap());
+    MetricsCollector::prune(history5m, sample["timeMs"].toInteger(), [](const QVariant& v) { return v.toMap().value("time").toLongLong(); });
+    const int next = sample["intervalSeconds"].toInt();
+    if (next > 0 && next != interval) {
+        interval = next;
+        emit metricsIntervalChanged();
+    }
+    emit metricsChanged();
+}
+void AgentClient::resetMetrics(const QJsonObject& data)
+{
+    history5m = data["history"].toArray().toVariantList();
+    latestMetrics = data["latest"].toObject().toVariantMap();
+    const int next = data["intervalSeconds"].toInt();
+    if (next > 0 && next != interval) {
+        interval = next;
+        emit metricsIntervalChanged();
+    }
+    emit metricsChanged();
 }
 void AgentClient::setSelectedId(const QString& id)
 {
@@ -176,8 +213,8 @@ void AgentClient::setSelectedId(const QString& id)
     }
     selected = id;
     history.clear();
+    console.reset(logs.value(id).lines);
     emit selectedIdChanged();
-    emit logsChanged();
     emit restartHistoryChanged();
     if (!id.isEmpty() && connected() && ids.contains(id)) {
         send("getLogs", { { "profileId", id } });
@@ -224,6 +261,9 @@ void AgentClient::applyStatus(const QJsonObject& data)
         if (!nextIds.contains(id)) {
             profiles.remove(id);
             logs.remove(id);
+            if (id == selected) {
+                console.reset({ });
+            }
         }
     }
     raw = next;
@@ -247,15 +287,13 @@ void AgentClient::appendLog(const QString& profileId, const QJsonObject& record,
         return;
     }
     log.sequence = n;
-    log.text += QString("[%1] [%2] %3").arg(record["time"].toString(), record["channel"].toString(), record["text"].toString());
-    if (!log.text.endsWith('\n')) {
-        log.text += '\n';
-    }
-    if (log.text.size() > 256 * 1024) {
-        log.text = log.text.right(192 * 1024);
+    const auto lines = LogModel::parse(record);
+    log.lines += lines;
+    if (log.lines.size() > LogModel::MaxLines) {
+        log.lines.remove(0, log.lines.size() - LogModel::MaxLines);
     }
     if (notify && profileId == selected) {
-        emit logsChanged();
+        console.append(lines);
     }
 }
 void AgentClient::receive()
@@ -278,6 +316,14 @@ void AgentClient::receive()
                 applyStatus(data);
             } else if (event == "log") {
                 appendLog(data["profileId"].toString(), data);
+            } else if (event == "metrics") {
+                applyMetrics(data);
+            } else if (event == "settings") {
+                const int next = data["settings"].toObject()["metricsIntervalSeconds"].toInt();
+                if (next > 0 && next != interval) {
+                    interval = next;
+                    emit metricsIntervalChanged();
+                }
             } else if (event == "warning") {
                 setError(data["message"].toString());
             } else if (event == "history" && data["profileId"].toString() == selected) {
@@ -315,8 +361,10 @@ void AgentClient::receive()
                     appendLog(profileId, entry.toObject(), false);
                 }
                 if (profileId == selected) {
-                    emit logsChanged();
+                    console.reset(logs.value(profileId).lines);
                 }
+            } else if (request.command == "getMetrics") {
+                resetMetrics(data);
             }
         }
     }
