@@ -241,7 +241,7 @@ private slots:
         QVERIFY(dir.isValid());
         QProcess gui;
         gui.start(binary("llama-manager"), { "--data-dir", dir.path(), "--smoke-test" });
-        QVERIFY(gui.waitForFinished(15000));
+        QVERIFY(gui.waitForFinished(30000)); // QML without a GPU (CI runners) is slow
         QLockFile lock(dir.path() + "/agent.lock");
         qint64 pid = 0;
         QString host, name;
@@ -1161,11 +1161,12 @@ private slots:
         first.setProcessEnvironment(environment);
         first.start(binary("llama-manager"), { "--data-dir", dir.path(), "--smoke-test" });
         QVERIFY(first.waitForStarted());
-        QTest::qWait(1500);
-        // A second launch hands over to the first and exits right away.
+        QTest::qWait(3000);
+        // A second launch hands over to the first and exits. The first answers once it has
+        // loaded its QML, which takes several seconds without a GPU (CI runners).
         QProcess second;
         second.start(binary("llama-manager"), { "--data-dir", dir.path() });
-        QVERIFY(second.waitForFinished(8000));
+        QVERIFY(second.waitForFinished(20000));
         QCOMPARE(second.exitCode(), 0);
         QCOMPARE(first.state(), QProcess::Running);
         // --quit closes the GUI and stops the Agent and its models.
@@ -1307,7 +1308,7 @@ private slots:
             guiEnvironment.insert("LSM_SCREENSHOT", QDir::currentPath() + "/gui-preview.png");
             gui.setProcessEnvironment(guiEnvironment);
             gui.start(binary("llama-manager"), { "--data-dir", dir.path(), "--smoke-test" });
-            QVERIFY(gui.waitForFinished(10000));
+            QVERIFY(gui.waitForFinished(30000)); // QML without a GPU (CI runners) is slow
             const auto errors = gui.readAllStandardError();
             QVERIFY2(gui.exitCode() == 0, qPrintable(QString("GUI exit=%1, stderr=%2").arg(gui.exitCode()).arg(QString::fromUtf8(errors))));
             QVERIFY2(!errors.contains("ReferenceError") && !errors.contains("TypeError") && !errors.contains("failed to load"), errors.constData());

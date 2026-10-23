@@ -140,8 +140,10 @@ int main(int argc, char** argv)
     // A second launch (e.g. from the Start menu while the GUI sits in the tray) shows the
     // existing window instead of opening another one.
     SingleInstance instance(directory);
+    // The running GUI answers from its event loop, which starts only after it has loaded the
+    // QML; on a busy or slow machine (just after signing in, no GPU) that can take a while.
     if (!instance.claim()) {
-        return instance.send("show") ? 0 : 3;
+        return instance.send("show", 15000) ? 0 : 3;
     }
 
     QQuickStyle::setStyle("Fusion");
