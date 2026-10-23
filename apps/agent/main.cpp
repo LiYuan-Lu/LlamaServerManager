@@ -28,5 +28,7 @@ int main(int argc, char** argv)
         QTextStream(stderr) << error << Qt::endl;
         return 4;
     }
+    QObject::connect(&server, &AgentServer::shutdownFinished, &app, &QCoreApplication::quit, Qt::QueuedConnection);
+    server.startAutoStartModels();
     return app.exec();
 }

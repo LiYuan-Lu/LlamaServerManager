@@ -30,6 +30,8 @@ class AgentClient : public QObject {
     Q_PROPERTY(QVariantList restartHistory READ restartHistory NOTIFY restartHistoryChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    // True after the user stopped the Agent: the GUI does not relaunch it until launchAgent().
+    Q_PROPERTY(bool agentStopped READ agentStopped NOTIFY agentStoppedChanged)
 public:
     explicit AgentClient(QString directory, bool autoLaunch = true, QObject* parent = nullptr);
     ~AgentClient() override;
@@ -47,6 +49,7 @@ public:
     QVariantList restartHistory() const { return history; }
     QString error() const { return lastError; }
     bool busy() const { return !pending.isEmpty(); }
+    bool agentStopped() const { return stoppedByUser; }
     Q_INVOKABLE void connectAgent();
     Q_INVOKABLE void start(const QString& profileId);
     Q_INVOKABLE void stop(const QString& profileId);
@@ -58,6 +61,10 @@ public:
     // Clears the console view of the selected model; log files on disk are kept.
     Q_INVOKABLE void clearLogs();
     Q_INVOKABLE void setMetricsInterval(int seconds);
+    // Stops every model and then the Agent itself. The GUI stays open.
+    Q_INVOKABLE void shutdownAgent();
+    // Starts the Agent again after shutdownAgent().
+    Q_INVOKABLE void launchAgent();
     Q_INVOKABLE void clearError() { setError({ }); }
 signals:
     void connectedChanged();
@@ -71,6 +78,7 @@ signals:
     void restartHistoryChanged();
     void errorChanged();
     void busyChanged();
+    void agentStoppedChanged();
 
 private:
     struct Pending {
@@ -90,6 +98,8 @@ private:
     void applyMetrics(const QJsonObject& sample);
     void resetMetrics(const QJsonObject& data);
     void clearMetrics();
+    void startAgentProcess();
+    void setStopped(bool stopped);
     QString directory;
     bool autoLaunch;
     QLocalSocket socket;
@@ -107,5 +117,6 @@ private:
     QVariantList history;
     QString selected, agentWarning, lastError;
     qint64 lastLaunch = 0;
+    bool stoppedByUser = false;
     QHash<QString, Pending> pending;
 };

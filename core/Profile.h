@@ -25,6 +25,7 @@ struct Profile {
     QString host = "127.0.0.1";
     int port = 8080, context = 4096, gpuLayers = 0, threads = 4, parallel = 1;
     bool metrics = false;
+    bool autoStart = false; // start this model when the Agent starts
     QStringList extraArguments;
     QJsonObject environment;
     WatchdogSettings watchdog;

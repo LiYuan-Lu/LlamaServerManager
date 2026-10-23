@@ -4,6 +4,7 @@
 #include "core/MetricsCollector.h"
 #include "core/ProfileStore.h"
 #include "core/ServerSupervisor.h"
+#include <QElapsedTimer>
 #include <QHash>
 #include <QList>
 #include <QLocalServer>
@@ -14,6 +15,11 @@ public:
     explicit AgentServer(const QString& directory, QObject* parent = nullptr);
     ~AgentServer() override;
     bool listen(QString& error);
+    // Starts every model whose profile has autoStart; call once after listen() succeeded.
+    void startAutoStartModels();
+signals:
+    // Emitted after a shutdownAgent request once every model has stopped; the Agent should exit.
+    void shutdownFinished();
 
 private:
     // One managed llama-server per profile; each has its own watchdog supervisor and log.
@@ -36,6 +42,7 @@ private:
         GetMetrics,
         GetSettings,
         UpdateSettings,
+        ShutdownAgent,
     };
     struct CommandSpec {
         Command command;
@@ -58,6 +65,8 @@ private:
     Reply startServer(Instance* instance, bool restart);
     Reply getMetrics() const;
     Reply updateSettings(const QJsonObject& message);
+    Reply shutdownAgent();
+    void finishShutdown();
     static bool parseProfile(const QJsonObject& message, Profile& profile, QString& error);
     // Broadcasts the new state after a profile change and returns it for the reply.
     QJsonObject publishSnapshot();
@@ -79,4 +88,7 @@ private:
     SettingsStore settingsStore;
     AppSettings settings;
     std::unique_ptr<MetricsCollector> metrics;
+    bool shuttingDown = false;
+    QTimer shutdownTimer;
+    QElapsedTimer shutdownClock;
 };

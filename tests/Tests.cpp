@@ -178,6 +178,47 @@ class Tests : public QObject {
         }
         return { };
     }
+    // Starts an Agent on `dir` and connects `socket` to it.
+    bool launchAgent(QProcess& agent, QLocalSocket& socket, const QString& dir)
+    {
+        agent.start(binary("llama-manager-agent"), { "--data-dir", dir });
+        if (!agent.waitForStarted()) {
+            return false;
+        }
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < 10000 && agent.state() == QProcess::Running) {
+            if (socket.state() == QLocalSocket::UnconnectedState) {
+                socket.connectToServer(Protocol::endpoint(dir));
+            }
+            if (socket.waitForConnected(100)) {
+                return true;
+            }
+            QTest::qWait(50);
+        }
+        return false;
+    }
+    static bool processAlive(qint64 pid)
+    {
+#ifdef Q_OS_WIN
+        HANDLE handle = OpenProcess(SYNCHRONIZE, FALSE, DWORD(pid));
+        if (!handle) {
+            return false;
+        }
+        const bool alive = WaitForSingleObject(handle, 0) == WAIT_TIMEOUT;
+        CloseHandle(handle);
+        return alive;
+#else
+        // Exists and is not a zombie (state follows the command name in /proc/<pid>/stat).
+        QFile stat(QString("/proc/%1/stat").arg(pid));
+        if (!stat.open(QIODevice::ReadOnly)) {
+            return false;
+        }
+        const auto line = stat.readAll();
+        const auto close = line.lastIndexOf(')');
+        return close > 0 && line.mid(close + 2, 1) != "Z";
+#endif
+    }
     QStringList outcomes(const QJsonArray& history)
     {
         QStringList list;
@@ -904,6 +945,89 @@ private slots:
         model.reset({ });
         QCOMPARE(model.rowCount(), 0);
         QCOMPARE(model.errorCount(), 0);
+    }
+    void autoStartAndShutdown()
+    {
+        // Profile field: optional, boolean, off by default, persisted.
+        Profile parsed;
+        QString error;
+        QVERIFY(Profile::fromJson({ }, parsed, error));
+        QVERIFY(!parsed.autoStart);
+        QVERIFY(!Profile::fromJson({ { "autoStart", "yes" } }, parsed, error));
+        QVERIFY(Profile::fromJson({ { "autoStart", true } }, parsed, error));
+        QVERIFY(parsed.autoStart);
+        QCOMPARE(parsed.toJson()["autoStart"].toBool(), true);
+
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        QProcess agent;
+        struct Cleanup {
+            QProcess& p;
+            ~Cleanup()
+            {
+                p.kill();
+                p.waitForFinished(5000);
+            }
+        } cleanup { agent };
+        QLocalSocket socket;
+        QVERIFY(launchAgent(agent, socket, dir.path()));
+        auto automatic = profile(dir.path());
+        automatic.name = "Automatic";
+        automatic.autoStart = true;
+        auto manual = profile(dir.path());
+        manual.name = "Manual";
+        auto clash = profile(dir.path());
+        clash.name = "Clash";
+        clash.port = automatic.port; // also auto start, but its port is taken by "Automatic"
+        clash.autoStart = true;
+        const auto autoId = rpc(socket, "createProfile", { { "profile", automatic.toJson() } })["data"].toObject()["id"].toString();
+        const auto manualId = rpc(socket, "createProfile", { { "profile", manual.toJson() } })["data"].toObject()["id"].toString();
+        const auto clashId = rpc(socket, "createProfile", { { "profile", clash.toJson() } })["data"].toObject()["id"].toString();
+        QVERIFY(!autoId.isEmpty() && !manualId.isEmpty() && !clashId.isEmpty());
+        QCOMPARE(instance(socket, autoId)["profile"].toObject()["autoStart"].toBool(), true);
+        // Creating a profile does not start it; auto start applies when the Agent starts.
+        QCOMPARE(instance(socket, autoId)["state"].toString(), QString("STOPPED"));
+        QVERIFY(rpc(socket, "startServer", { { "profileId", manualId } })["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, manualId)["state"].toString(), "RUNNING", 10000);
+        const auto manualPid = instance(socket, manualId)["pid"].toInteger();
+        QVERIFY(processAlive(manualPid));
+
+        // Stop Agent: models are stopped like a manual Stop, then the Agent exits normally.
+        const auto shutdown = rpc(socket, "shutdownAgent");
+        QVERIFY2(shutdown["ok"].toBool(), qPrintable(shutdown["error"].toString()));
+        QVERIFY(agent.waitForFinished(20000));
+        QCOMPARE(agent.exitStatus(), QProcess::NormalExit);
+        QCOMPARE(agent.exitCode(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!processAlive(manualPid), 5000);
+        QVERIFY(!QFile::exists(dir.path() + "/agent.lock"));
+        QFile serverLog(dir.path() + "/logs/" + manualId + "/server.jsonl");
+        QVERIFY(serverLog.open(QIODevice::ReadOnly));
+        QVERIFY(serverLog.readAll().contains("Agent is shutting down"));
+
+        // Restarting the Agent starts only the auto start models; a port conflict is reported, not fatal.
+        socket.abort();
+        QVERIFY(launchAgent(agent, socket, dir.path()));
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, autoId)["state"].toString(), "RUNNING", 10000);
+        QCOMPARE(instance(socket, manualId)["state"].toString(), QString("STOPPED"));
+        QCOMPARE(instance(socket, clashId)["state"].toString(), QString("STOPPED"));
+        const auto status = rpc(socket, "getStatus")["data"].toObject();
+        QVERIFY2(status["warning"].toString().contains("Auto start failed"), qPrintable(status["warning"].toString()));
+        bool logged = false;
+        for (const auto& entry : rpc(socket, "getLogs", { { "profileId", clashId } })["data"].toObject()["entries"].toArray()) {
+            logged = logged || entry.toObject()["text"].toString().contains("Auto start failed");
+        }
+        QVERIFY(logged);
+        // Commands that change state are refused once shutdown has begun.
+        const auto autoPid = instance(socket, autoId)["pid"].toInteger();
+        Protocol::send(&socket, { { "version", 1 }, { "id", "bye" }, { "command", "shutdownAgent" } });
+        const auto refused = rpc(socket, "startServer", { { "profileId", manualId } });
+        if (!refused.isEmpty()) {
+            QVERIFY(!refused["ok"].toBool());
+            QCOMPARE(refused["error"].toString(), QString("The Agent is shutting down"));
+        }
+        QVERIFY(agent.waitForFinished(20000));
+        QCOMPARE(agent.exitCode(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!processAlive(autoPid), 5000);
     }
     void agentAndGuiReconnect()
     {

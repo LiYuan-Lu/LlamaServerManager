@@ -10,6 +10,8 @@ Each saved profile is one model. The Agent creates an independent ServerSupervis
 
 The GUI opens on a grid of model cards. Each card shows the state, model file, address, PID, and uptime, with one Start/Stop toggle button and a Restart button. The trailing + card opens an empty editor; saving it sends createProfile. Clicking a card opens its detail page with the controls, the profile editor, the model's console, and Delete.
 
+Models whose profile has `autoStart` are started right after the Agent begins listening. **Stop Agent** (`shutdownAgent`) stops every model like a manual Stop, waits until they have stopped, and exits with code 0, which releases the lock; a GUI that sees the `shutdown` event stops auto-launching the Agent until the user clicks Start Agent.
+
 The GUI never owns the llama-server QProcess. The Agent is launched with startDetached, so its lifetime is independent of the GUI socket and GUI shutdown. While the Agent is alive, it owns the model PID, state, launch arguments, and recent logs. Reconnecting the GUI does not restart the model. Stale PIDs on disk are not treated as live processes, and unknown processes are not adopted.
 
 ## States

@@ -33,6 +33,7 @@ Rectangle {
         else if (s === "STARTING") text = (profile.watchdog || {}).healthCheck === false ? qsTr("Starting…") : qsTr("Loading model…")
         else if (s === "RUNNING") text = i.health === "Healthy" ? "✓ " + qsTr("Healthy") : card.healthText(i.health)
         if ((profile.watchdog || {}).autoRestart === false) text += (text ? "  ·  " : "") + qsTr("Auto restart off")
+        if (profile.autoStart === true) text += (text ? "  ·  " : "") + qsTr("Starts with Agent")
         return text
     }
     border.width: 1

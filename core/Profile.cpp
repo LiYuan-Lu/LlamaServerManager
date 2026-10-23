@@ -11,7 +11,7 @@ QJsonObject Profile::toJson() const
 {
     return { { "id", id }, { "name", name }, { "executable", executable }, { "model", model }, { "workingDirectory", workingDirectory },
         { "host", host }, { "port", port }, { "context", context }, { "gpuLayers", gpuLayers },
-        { "threads", threads }, { "parallel", parallel }, { "metrics", metrics },
+        { "threads", threads }, { "parallel", parallel }, { "metrics", metrics }, { "autoStart", autoStart },
         { "extraArguments", QJsonArray::fromStringList(extraArguments) }, { "environment", environment },
         { "watchdog", watchdog.toJson() } };
 }
@@ -54,6 +54,11 @@ bool Profile::fromJson(const QJsonObject& o, Profile& p, QString& error)
         return false;
     }
     candidate.metrics = o["metrics"].toBool();
+    if (o.contains("autoStart") && !o["autoStart"].isBool()) {
+        error = "autoStart must be boolean";
+        return false;
+    }
+    candidate.autoStart = o["autoStart"].toBool();
     if (o.contains("extraArguments") && !o["extraArguments"].isArray()) {
         error = "extraArguments must be an array";
         return false;

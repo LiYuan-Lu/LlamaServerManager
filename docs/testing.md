@@ -133,3 +133,14 @@ Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1�
 - Windows 建置（MSVC `/W4`）與 CTest。Windows 專用的程式碼路徑（`GetSystemTimes`、`GetProcessTimes`、`GetProcessMemoryInfo`、`GlobalMemoryStatusEx`、從系統路徑載入 nvml.dll）只寫好、尚未執行。
 - 真實 NVIDIA GPU 與驅動：實際的 NVML 數值、WDDM 下每個程序的 VRAM 是否如預期顯示 n/a、多張 GPU。
 - 原生 Windows 檔案對話框的「匯出…」互動，以及長時間執行下圖表的流暢度。
+
+# 複製 Profile、自動啟動、停止 Agent 測試紀錄
+
+測試環境同上一節（Ubuntu 24.04、Qt 6.4.2、offscreen）。**尚未在 Windows 上執行。**
+
+- 全部 targets 編譯成功，`-Wall -Wextra` 無警告；18 項中 18 項通過（`guiDetachedAgent` 在非 Windows 平台自動略過），連續 2 輪。
+- 新增 `autoStartAndShutdown`：`autoStart` 欄位的預設值、型別檢查與保存；建立 Profile 時不會自動啟動；`shutdownAgent` 會停止執行中的模型（程序確實結束、日誌留下原因）、Agent 以 exit code 0 結束並釋放 lock；重新啟動 Agent 後只有勾選自動啟動的模型會執行，Port 衝突的那個留在 STOPPED，並出現在 warning 與該模型的日誌；開始關閉後拒絕會改變狀態的命令。
+- GUI 截圖檢查：模型頁的「Duplicate」按鈕、預填複本設定的新增頁（名稱加上「(copy)」、使用下一個 Port、不勾自動啟動）、GUI 連線中停止 Agent 後顯示「Agent stopped」與「Start Agent」，且 GUI 不會自己重新啟動 Agent。
+
+尚未驗證：Windows 上停止 Agent 時，llama-server 不回應 terminate 會在 3 秒後被強制結束，因此整個關閉會多花約 3 秒；「Start Agent」按鈕與原本的自動啟動共用同一段程式，但沒有自動化 GUI 點擊測試。
+

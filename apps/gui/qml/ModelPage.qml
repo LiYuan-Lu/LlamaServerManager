@@ -8,11 +8,14 @@ Item {
     id: page
     property string profileId: ""
     property int suggestedPort: 8080
+    // Settings to prefill a new model with (Duplicate); ignored for saved models.
+    property var template: null
     readonly property bool isNew: profileId === ""
     readonly property var info: agent.instances[profileId] || ({})
     readonly property string serverState: info.state || "STOPPED"
     readonly property bool idle: serverState === "STOPPED" || serverState === "FAILED"
     signal back()
+    signal duplicate(var profile)
     function healthText(health) {
         if (!health) return "—"
         if (health === "Healthy") return qsTr("Healthy")
@@ -47,10 +50,17 @@ Item {
             Layout.fillWidth: true; spacing: 12
             Button { text: qsTr("← All models"); flat: true; onClicked: page.back() }
             Label {
-                text: page.isNew ? qsTr("New model") : (page.info.name || "")
+                text: page.isNew ? (page.template ? qsTr("New model (copy)") : qsTr("New model")) : (page.info.name || "")
                 font.pixelSize: 20; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true
             }
             StateBadge { visible: !page.isNew; serverState: page.serverState }
+            Button {
+                visible: !page.isNew
+                text: qsTr("Duplicate")
+                enabled: page.info.profile !== undefined
+                ToolTip.visible: hovered; ToolTip.text: qsTr("Create a new model with a copy of these settings")
+                onClicked: page.duplicate(page.info.profile)
+            }
             Button {
                 visible: !page.isNew
                 text: qsTr("Delete")
@@ -95,7 +105,7 @@ Item {
                 contentWidth: availableWidth
                 ProfileEditor {
                     id: editor; width: parent.width
-                    profileId: page.profileId; suggestedPort: page.suggestedPort
+                    profileId: page.profileId; suggestedPort: page.suggestedPort; template: page.template
                     editable: agent.connected && page.idle && page.info.busy !== true
                 }
             }

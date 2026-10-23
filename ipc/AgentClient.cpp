@@ -20,6 +20,7 @@ AgentClient::AgentClient(QString dir, bool launch, QObject* parent)
     connect(&retry, &QTimer::timeout, this, &AgentClient::connectAgent);
     retry.start();
     connect(&socket, &QLocalSocket::connected, this, [this] {
+        setStopped(false); // another GUI or the user started the Agent again
         buffer.clear();
         logs.clear();
         console.reset({ });
@@ -41,31 +42,15 @@ AgentClient::AgentClient(QString dir, bool launch, QObject* parent)
         rebuild();
         emit busyChanged();
         emit connectedChanged();
-        setError("Agent disconnected; displayed status is stale. Reconnecting...");
+        setError(stoppedByUser ? QString() : QString("Agent disconnected; displayed status is stale. Reconnecting..."));
     });
     connect(&socket, &QLocalSocket::errorOccurred, this, [this](QLocalSocket::LocalSocketError) {
+        if (stoppedByUser) {
+            return; // keep quietly retrying the connection, but never relaunch on our own
+        }
         setError(socket.errorString());
-        const auto now = QDateTime::currentMSecsSinceEpoch();
-        if (autoLaunch && now - lastLaunch > 10000) {
-            lastLaunch = now;
-#ifdef Q_OS_WIN
-            const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent.exe";
-#else
-            const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent";
-#endif
-            QProcess detached;
-            detached.setProgram(executable);
-            detached.setArguments({ "--data-dir", directory });
-            detached.setWorkingDirectory(QCoreApplication::applicationDirPath());
-#ifdef Q_OS_WIN
-            detached.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args) {
-                args->flags &= ~CREATE_NEW_CONSOLE;
-                args->flags |= CREATE_NO_WINDOW;
-            });
-#endif
-            if (!detached.startDetached()) {
-                setError("Cannot launch Agent: " + executable);
-            }
+        if (autoLaunch && QDateTime::currentMSecsSinceEpoch() - lastLaunch > 10000) {
+            startAgentProcess();
         }
     });
     connect(&socket, &QLocalSocket::readyRead, this, &AgentClient::receive);
@@ -176,6 +161,50 @@ void AgentClient::setMetricsInterval(int seconds)
 {
     setError({ });
     send("updateSettings", { { "settings", QJsonObject { { "metricsIntervalSeconds", seconds } } } });
+}
+void AgentClient::startAgentProcess()
+{
+    lastLaunch = QDateTime::currentMSecsSinceEpoch();
+#ifdef Q_OS_WIN
+    const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent.exe";
+#else
+    const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent";
+#endif
+    QProcess detached;
+    detached.setProgram(executable);
+    detached.setArguments({ "--data-dir", directory });
+    detached.setWorkingDirectory(QCoreApplication::applicationDirPath());
+#ifdef Q_OS_WIN
+    detached.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args) {
+        args->flags &= ~CREATE_NEW_CONSOLE;
+        args->flags |= CREATE_NO_WINDOW;
+    });
+#endif
+    if (!detached.startDetached()) {
+        setError("Cannot launch Agent: " + executable);
+    }
+}
+void AgentClient::setStopped(bool stopped)
+{
+    if (stoppedByUser == stopped) {
+        return;
+    }
+    stoppedByUser = stopped;
+    emit agentStoppedChanged();
+}
+void AgentClient::shutdownAgent()
+{
+    setError({ });
+    send("shutdownAgent");
+}
+void AgentClient::launchAgent()
+{
+    setStopped(false);
+    setError({ });
+    if (!connected()) {
+        startAgentProcess();
+        connectAgent();
+    }
 }
 void AgentClient::clearMetrics()
 {
@@ -324,6 +353,8 @@ void AgentClient::receive()
                     interval = next;
                     emit metricsIntervalChanged();
                 }
+            } else if (event == "shutdown") {
+                setStopped(true);
             } else if (event == "warning") {
                 setError(data["message"].toString());
             } else if (event == "history" && data["profileId"].toString() == selected) {

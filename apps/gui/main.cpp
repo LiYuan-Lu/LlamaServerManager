@@ -34,13 +34,19 @@ int main(int argc, char** argv)
     client.connectAgent();
     if (parser.isSet("smoke-test")) {
         // Test hooks: LSM_SCREENSHOT saves the window after LSM_SCREENSHOT_DELAY_MS (default 700);
-        // LSM_SMOKE_OPEN opens that model's detail page first.
+        // LSM_SMOKE_OPEN opens that model's detail page first ("duplicate:<id>" opens a copy).
         const auto screenshot = qEnvironmentVariable("LSM_SCREENSHOT");
         const int delay = qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") > 0 ? qEnvironmentVariableIntValue("LSM_SCREENSHOT_DELAY_MS") : 700;
         const auto open = qEnvironmentVariable("LSM_SMOKE_OPEN");
         if (!open.isEmpty()) {
-            QTimer::singleShot(delay / 2, &app, [&engine, open] {
-                QMetaObject::invokeMethod(engine.rootObjects().first(), "openModel", Q_ARG(QVariant, open));
+            QTimer::singleShot(delay / 2, &app, [&engine, &client, open] {
+                auto* root = engine.rootObjects().first();
+                if (open.startsWith("duplicate:")) {
+                    const auto profile = client.instances().value(open.mid(10)).toMap().value("profile");
+                    QMetaObject::invokeMethod(root, "duplicateModel", Q_ARG(QVariant, profile));
+                } else {
+                    QMetaObject::invokeMethod(root, "openModel", Q_ARG(QVariant, open));
+                }
             });
         }
         if (!screenshot.isEmpty()) {

@@ -7,6 +7,8 @@ ColumnLayout {
     id: editor
     property string profileId: ""
     property int suggestedPort: 8080
+    // Prefills an unsaved model (Duplicate); saved models always load their own profile.
+    property var template: null
     property bool editable: false
     property bool dirty: false
     // Set while a create/update request is in flight so the page can follow a new model's ID.
@@ -15,13 +17,14 @@ ColumnLayout {
     spacing: 8
     function load() {
         const entry = agent.instances[profileId]
-        const p = entry ? (entry.profile || {}) : {}
+        const p = entry ? (entry.profile || {}) : (template || {})
         name.text = p.name || ""
         exe.text = p.executable || ""; model.text = p.model || ""; cwd.text = p.workingDirectory || ""
-        host.text = p.host || "127.0.0.1"; port.text = String(p.port || suggestedPort)
+        host.text = p.host || "127.0.0.1"; port.text = String(entry ? (p.port || suggestedPort) : suggestedPort)
         context.text = String(p.context || 4096); gpu.text = String(p.gpuLayers === undefined ? 0 : p.gpuLayers)
         threads.text = String(p.threads || 4); parallel.text = String(p.parallel || 1)
         metrics.checked = p.metrics || false
+        autoStartBox.checked = p.autoStart === true
         extra.text = JSON.stringify(p.extraArguments || []); env.text = JSON.stringify(p.environment || {})
         const w = p.watchdog || {}
         autoRestart.checked = w.autoRestart !== false; healthCheck.checked = w.healthCheck !== false
@@ -42,7 +45,7 @@ ColumnLayout {
             validationError = ""
             const profile = {name: name.text.trim(), executable: exe.text, model: model.text, workingDirectory: cwd.text,
                 host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],
-                metrics: metrics.checked, extraArguments: args, environment: variables,
+                metrics: metrics.checked, autoStart: autoStartBox.checked, extraArguments: args, environment: variables,
                 watchdog: {autoRestart: autoRestart.checked, healthCheck: healthCheck.checked,
                     intervalSeconds: wd[0], timeoutSeconds: wd[1], failureThreshold: wd[2], startupGraceSeconds: wd[3],
                     cooldownSeconds: wd[4], maxBackoffSeconds: wd[5], maxRestarts: wd[6], windowSeconds: wd[7]}}
@@ -101,6 +104,14 @@ ColumnLayout {
         TextField { id: extra; Layout.fillWidth: true; placeholderText: '["--verbose"]'; onTextEdited: editor.dirty = true }
         Label { text: qsTr("Environment variables (JSON)") }
         TextField { id: env; Layout.fillWidth: true; placeholderText: '{"NAME":"value"}'; onTextEdited: editor.dirty = true }
+    }
+    CheckBox {
+        id: autoStartBox
+        enabled: editor.editable
+        text: qsTr("Start automatically when the Agent starts")
+        onClicked: editor.dirty = true
+        ToolTip.visible: hovered
+        ToolTip.text: qsTr("Each time the Agent starts, it starts this model too. Models stopped with Stop stay stopped until the next Agent start.")
     }
     GroupBox {
         title: qsTr("Watchdog")

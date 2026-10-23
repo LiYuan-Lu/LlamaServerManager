@@ -92,7 +92,7 @@ ColumnLayout {
             Layout.fillWidth: true
             title: panel.gpuAvailable && panel.device.name ? qsTr("GPU · %1").arg(panel.device.name) : qsTr("GPU")
             accent: Theme.gpuColor
-            value: panel.gpuAvailable ? Theme.percent(panel.device.utilizationPercent) : qsTr("Not available")
+            value: panel.gpuAvailable ? Theme.percent(panel.device.utilizationPercent) : panel.latest.time ? qsTr("Not available") : "—"
             detail: {
                 if (!panel.gpuAvailable) return panel.latest.time ? panel.gpuReason(panel.gpu.reason) : ""
                 const parts = []
@@ -108,7 +108,7 @@ ColumnLayout {
             Layout.fillWidth: true
             title: qsTr("VRAM")
             accent: Theme.vramColor
-            value: panel.gpuAvailable ? Theme.bytes(panel.device.memoryUsedBytes) : qsTr("Not available")
+            value: panel.gpuAvailable ? Theme.bytes(panel.device.memoryUsedBytes) : panel.latest.time ? qsTr("Not available") : "—"
             detail: panel.gpuAvailable && Theme.available(panel.device.memoryTotalBytes)
                 ? qsTr("of %1 · all processes on this GPU").arg(Theme.bytes(panel.device.memoryTotalBytes)) : ""
             times: panel.series.times; values: panel.series.vram; maxValue: 100; gapMs: panel.gapMs

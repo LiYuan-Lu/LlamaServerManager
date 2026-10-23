@@ -58,6 +58,22 @@ AgentServer::AgentServer(const QString& dir, QObject* parent)
     connect(metrics.get(), &MetricsCollector::sampled, this, [this](const QJsonObject& sample) { broadcast("metrics", sample); });
     metrics->start();
 }
+void AgentServer::startAutoStartModels()
+{
+    for (auto* instance : instances) {
+        if (!instance->profile.autoStart || instance->manager->active()) {
+            continue;
+        }
+        instance->logs->append("agent", "Auto start: starting with the Agent\n");
+        const auto reply = startServer(instance, false);
+        if (!reply.error.isEmpty()) {
+            // Recorded on the model's console and as a warning; the Agent keeps running.
+            const auto message = "Auto start failed: " + reply.error;
+            instance->logs->append("agent", message + "\n");
+            loadWarning += (loadWarning.isEmpty() ? "" : "; ") + instance->profile.displayName() + ": " + message;
+        }
+    }
+}
 bool AgentServer::listen(QString& error)
 {
     server.setSocketOptions(QLocalServer::UserAccessOption);
@@ -205,6 +221,7 @@ const QHash<QString, AgentServer::CommandSpec>& AgentServer::commands()
         { "getMetrics", { Command::GetMetrics, false } },
         { "getSettings", { Command::GetSettings, false } },
         { "updateSettings", { Command::UpdateSettings, false } },
+        { "shutdownAgent", { Command::ShutdownAgent, false } },
     };
     return table;
 }
@@ -224,6 +241,11 @@ AgentServer::Reply AgentServer::execute(const QJsonObject& m)
     const auto spec = commands().constFind(name);
     if (spec == commands().cend()) {
         return Reply::failure("Unknown or unavailable command: " + name);
+    }
+    if (shuttingDown && spec->command != Command::GetStatus && spec->command != Command::GetLogs
+        && spec->command != Command::GetRestartHistory && spec->command != Command::GetMetrics
+        && spec->command != Command::GetSettings && spec->command != Command::ListProfiles) {
+        return Reply::failure("The Agent is shutting down");
     }
     Instance* instance = nullptr;
     if (spec->targetsProfile) {
@@ -260,6 +282,8 @@ AgentServer::Reply AgentServer::execute(const QJsonObject& m)
         return Reply::success({ { "settings", settings.toJson() } });
     case Command::UpdateSettings:
         return updateSettings(m);
+    case Command::ShutdownAgent:
+        return shutdownAgent();
     }
     return Reply::failure("Unhandled command: " + name); // every enum value is handled above
 }
@@ -386,4 +410,38 @@ AgentServer::Reply AgentServer::updateSettings(const QJsonObject& m)
     const QJsonObject data { { "settings", settings.toJson() } };
     broadcast("settings", data);
     return Reply::success(data);
+}
+AgentServer::Reply AgentServer::shutdownAgent()
+{
+    // Every model is stopped like a manual Stop (no automatic restarts), then the Agent exits.
+    shuttingDown = true;
+    broadcast("shutdown", { });
+    for (auto* instance : instances) {
+        if (instance->manager->active()) {
+            instance->logs->append("agent", "Stopping because the Agent is shutting down\n");
+            instance->manager->stop();
+        }
+    }
+    shutdownClock.start();
+    shutdownTimer.setInterval(100);
+    connect(&shutdownTimer, &QTimer::timeout, this, &AgentServer::finishShutdown, Qt::UniqueConnection);
+    shutdownTimer.start();
+    return Reply::success();
+}
+void AgentServer::finishShutdown()
+{
+    bool active = false;
+    for (const auto* instance : instances) {
+        active = active || instance->manager->active();
+    }
+    // Stop falls back to kill after three seconds; the deadline only guards against surprises,
+    // and the destructor still kills anything left.
+    if (active && shutdownClock.elapsed() < 15000) {
+        return;
+    }
+    shutdownTimer.stop();
+    for (auto* socket : clients.keys()) {
+        socket->flush();
+    }
+    emit shutdownFinished();
 }

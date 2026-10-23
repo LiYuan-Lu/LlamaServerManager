@@ -36,6 +36,7 @@ Commands that act on one model take a `profileId` string. A missing or unknown `
 | stopServer | request.profileId; cancels a pending manual restart and stops that model's process; repeated stop is safe |
 | restartServer | request.profileId; stops and restarts in RUNNING/UNHEALTHY/RESTARTING/BACKOFF; acts as start in STOPPED/FAILED |
 | getRestartHistory | request.profileId; data: `profileId`, `entries` (up to 50 watchdog records, oldest first) |
+| shutdownAgent | stops every model like stopServer, broadcasts a `shutdown` event, and exits the Agent once all models have stopped (at most about 15 s). While shutting down, only read commands are accepted |
 | getMetrics | data: `intervalSeconds`, `historySeconds` (300), `latest` (last sample, see below; empty before the first one), `history` (compact points, oldest first) |
 | getSettings | data.settings: `{metricsIntervalSeconds}` |
 | updateSettings | request.settings: fields to change (unknown fields are rejected); validated, saved to settings.json, applied, and broadcast as a `settings` event; data.settings: the new settings |
@@ -46,7 +47,7 @@ Each element of `instances` contains: id, name, state, pid, port, model, uptimeS
 
 A restart history record contains time, profileId, pid, kind (`crash`, `startup`, `health`), reason, attempt, and outcome.
 
-A `status` event contains a complete snapshot (same shape as getStatus). A `log` event contains one record plus its `profileId`. A `history` event contains `profileId` and the full `entries` array of that model whenever its restart history changes. A `warning` event contains a message (and `profileId` when it concerns one model), such as a disk logging failure. A `metrics` event contains one sample (see below). A `settings` event contains `settings` after it changed. Unknown commands return ok=false. Invalid JSON, incompatible versions, oversized frames, or invalid IDs cause disconnection.
+A `status` event contains a complete snapshot (same shape as getStatus). A `log` event contains one record plus its `profileId`. A `history` event contains `profileId` and the full `entries` array of that model whenever its restart history changes. A `warning` event contains a message (and `profileId` when it concerns one model), such as a disk logging failure. A `shutdown` event (empty data) announces that the Agent is stopping at a user's request; GUIs must not relaunch it automatically afterwards. A `metrics` event contains one sample (see below). A `settings` event contains `settings` after it changed. Unknown commands return ok=false. Invalid JSON, incompatible versions, oversized frames, or invalid IDs cause disconnection.
 
 A successful response means the command was accepted, not that the model has finished loading. Observe status and logs for the outcome. Disconnecting does not stop the service. On reconnection, the GUI must request getStatus (and getLogs for the model it is showing) rather than automatically replaying start/restart commands.
 
@@ -68,7 +69,9 @@ A history point: `{"time":<ms since epoch>,"cpu":<percent>,"ramUsed":<bytes>,"ra
 
 ## Profile fields
 
-Defaults: id/name/executable/model/workingDirectory are empty strings; host=127.0.0.1, port=8080, context=4096, gpuLayers=0, threads=4, parallel=1, metrics=false, extraArguments=[], environment={}.
+Defaults: id/name/executable/model/workingDirectory are empty strings; host=127.0.0.1, port=8080, context=4096, gpuLayers=0, threads=4, parallel=1, metrics=false, autoStart=false, extraArguments=[], environment={}.
+
+`autoStart`: when true, the Agent starts this model each time the Agent starts (after it begins listening). A failure, such as a port conflict, is added to the status `warning` and to the model's log; the Agent keeps running.
 
 Startup requires existing absolute executable and GGUF paths. Host must be a numeric IP address; GPU layers accepts -1. Each extraArguments element is passed separately to QProcess without a shell. Overriding the main managed options is prohibited.
 
