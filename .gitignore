@@ -1,0 +1,8 @@
+/build*/
+/deploy/
+/test-results/
+CMakeUserPresets.json
+*.user
+/lsm-test-*/
+/test-output.txt
+/gui-preview.png

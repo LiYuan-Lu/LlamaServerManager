@@ -1,0 +1,69 @@
+#include "Profile.h"
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QHostAddress>
+#include <QSet>
+#include <cmath>
+
+QJsonObject Profile::toJson() const {
+    return {{"executable", executable}, {"model", model}, {"workingDirectory", workingDirectory},
+        {"host", host}, {"port", port}, {"context", context}, {"gpuLayers", gpuLayers},
+        {"threads", threads}, {"parallel", parallel}, {"metrics", metrics},
+        {"extraArguments", QJsonArray::fromStringList(extraArguments)}, {"environment", environment}};
+}
+bool Profile::fromJson(const QJsonObject &o, Profile &p, QString &error) {
+    Profile candidate;
+    auto str = [&](const char *key, QString &value) {
+        if (!o.contains(key)) return true;
+        if (!o[key].isString()) { error = QString("%1 must be a string").arg(key); return false; }
+        value = o[key].toString(); return true;
+    };
+    auto number = [&](const char *key, int &value) {
+        if (!o.contains(key)) return true;
+        const double n = o[key].toDouble(-1e20);
+        if (!o[key].isDouble() || n != std::floor(n) || n < -1 || n > 2147483647.) {
+            error = QString("%1 must be an integer").arg(key); return false;
+        }
+        value = int(n); return true;
+    };
+    if (!str("executable", candidate.executable) || !str("model", candidate.model)
+        || !str("workingDirectory", candidate.workingDirectory) || !str("host", candidate.host)
+        || !number("port", candidate.port) || !number("context", candidate.context)
+        || !number("gpuLayers", candidate.gpuLayers) || !number("threads", candidate.threads)
+        || !number("parallel", candidate.parallel)) return false;
+    if (o.contains("metrics") && !o["metrics"].isBool()) { error = "metrics must be boolean"; return false; }
+    candidate.metrics = o["metrics"].toBool();
+    if (o.contains("extraArguments") && !o["extraArguments"].isArray()) { error = "extraArguments must be an array"; return false; }
+    for (const auto &v : o["extraArguments"].toArray()) {
+        if (!v.isString()) { error = "Arguments must be strings"; return false; }
+        candidate.extraArguments << v.toString();
+    }
+    if (o.contains("environment") && !o["environment"].isObject()) { error = "environment must be an object"; return false; }
+    candidate.environment = o["environment"].toObject();
+    error = candidate.validate(false);
+    if (!error.isEmpty()) return false;
+    p = candidate; return true;
+}
+QString Profile::validate(bool files) const {
+    if (port < 1 || port > 65535 || context < 1 || gpuLayers < -1 || threads < 1 || parallel < 1)
+        return "Invalid port/context/GPU layers/threads/parallel value";
+    if (QHostAddress(host).isNull()) return "Host must be a numeric IPv4 or IPv6 address";
+    if (executable.contains(QChar::Null) || model.contains(QChar::Null) || workingDirectory.contains(QChar::Null)) return "Invalid path";
+    if (files) {
+        if (!QFileInfo(executable).isAbsolute() || !QFileInfo(executable).isFile()) return "Select an existing absolute executable path";
+        if (!QFileInfo(model).isAbsolute() || !QFileInfo(model).isFile() || !model.endsWith(".gguf", Qt::CaseInsensitive)) return "Select an existing GGUF model";
+        if (!workingDirectory.isEmpty() && (!QFileInfo(workingDirectory).isAbsolute() || !QFileInfo(workingDirectory).isDir())) return "Working directory does not exist";
+    }
+    const QSet<QString> reserved = {"-m", "--model", "--model-url", "-mu", "--hf-repo", "-hf", "--host", "--port", "-c", "--ctx-size", "-ngl", "--gpu-layers", "--n-gpu-layers", "-t", "--threads", "--parallel", "-np", "--metrics", "--help", "-h", "--version"};
+    for (const auto &arg : extraArguments)
+        if (arg.contains(QChar::Null) || reserved.contains(arg.section('=', 0, 0))) return "Extra arguments must not override managed options or request help/version";
+    for (auto i = environment.begin(); i != environment.end(); ++i)
+        if (i.key().isEmpty() || i.key().contains('=') || i.key().contains(QChar::Null) || !i.value().isString() || i.value().toString().contains(QChar::Null)) return "Invalid environment variable";
+    return {};
+}
+QStringList Profile::arguments() const {
+    QStringList a = {"-m", model, "-c", QString::number(context), "-ngl", QString::number(gpuLayers),
+        "-t", QString::number(threads), "--host", host, "--port", QString::number(port), "--parallel", QString::number(parallel)};
+    if (metrics) a << "--metrics";
+    return a + extraArguments;
+}
