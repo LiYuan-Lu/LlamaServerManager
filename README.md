@@ -178,13 +178,15 @@ docs/           Design and test documentation
 
 ## Roadmap
 
-Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, and the first part of desktop integration (Phase 4): system tray, start at sign-in, and the Windows installer.
+Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, and desktop integration (Phase 4): system tray, start at sign-in, and the Windows installer.
 
 Next:
 
-- Optional Windows Service for the Agent, with permission management
-- macOS app bundle and DMG, Linux packages (the tray and start-at-sign-in code already has macOS and Linux backends)
+- Prebuilt releases on GitHub, built by CI
 - Signed release builds
+- macOS app bundle and DMG, Linux packages (the tray and start-at-sign-in code already has macOS and Linux backends)
+
+A Windows Service mode is not planned: start at sign-in covers the intended single-user setup (see [docs/phase4.md](docs/phase4.md#out-of-scope)).
 
 ## Contributing
 

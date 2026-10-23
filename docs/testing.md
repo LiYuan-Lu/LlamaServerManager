@@ -164,6 +164,7 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 - 通知區域的系統匣圖示與選單。
 - 安裝、升級、移除的完整流程。
 - `llama-manager.exe` 與 `llama-manager-agent.exe` 的圖示與版本資訊（`.rc` 資源）。
+- 全新安裝的 Windows 11 虛擬機（沒有 Visual C++ 執行階段、沒有獨立顯示卡）：安裝程式自動安裝 Visual C++ 執行階段，程式正常運作；沒有 NVIDIA GPU 時資源監控也正常。
 
 ## Windows 上發現並修正
 
@@ -173,5 +174,4 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 
 ## 尚未驗證
 
-- Windows：在尚未安裝 Visual C++ 執行階段的電腦上由安裝程式自動安裝。
 - macOS：app bundle、選單列單色圖示、LaunchAgent 登入啟動（目前只測試了 plist 的內容與讀寫）。

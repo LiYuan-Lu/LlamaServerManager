@@ -1,6 +1,6 @@
-# Phase 4 — Desktop integration (part 1)
+# Phase 4 — Desktop integration
 
-Status: system tray, start at sign-in, single GUI instance, and the Windows installer are implemented. Windows Service support and Agent permission management are the next part. The design is cross-platform: Windows is the first complete target, and macOS and Linux have their own backends where the platforms differ.
+Status: system tray, start at sign-in, single GUI instance, and the Windows installer are implemented. Phase 4 is complete; Windows Service mode is out of scope (see [below](#out-of-scope)). The design is cross-platform: Windows is the first complete target, and macOS and Linux have their own backends where the platforms differ.
 
 ## System tray
 
@@ -48,8 +48,12 @@ Turn it on or off in the window's **⋯** menu or the tray menu, or from the com
 
 The Windows installer (`packaging/windows/LlamaServerManager.iss`, Inno Setup 6) is built by `packaging/windows/build-installer.ps1`. It installs to Program Files, installs the Visual C++ runtime if needed, offers start at sign-in (on by default, created for the user who ran the installer) and a desktop shortcut, runs `--quit` before upgrading or uninstalling, removes the sign-in task on uninstall, and keeps the user's data. Both executables carry an icon and version information.
 
-## Not implemented yet
+## Out of scope
 
-- Windows Service mode for the Agent (`%PROGRAMDATA%` data directory, service account, pipe permissions for other users).
+- **Windows Service mode for the Agent.** The app is meant for one user who runs models after signing in, which start at sign-in already covers. A service would only add running before anyone signs in and sharing one Agent between users, at the cost of a separate service account (which may not be able to read models in the user's profile or mapped drives), a `%PROGRAMDATA%` data directory, administrator rights for install and upgrade, and harder debugging. It can be reconsidered if a headless or multi-user use case comes up.
+- **Agent permission management beyond the current user.** The Agent's IPC endpoint already accepts only the current user (`QLocalServer::UserAccessOption`), which is all a single-user Agent needs.
+
+## Not implemented yet (optional)
+
 - macOS DMG and Linux packages.
 - Code signing of the executables and installer.

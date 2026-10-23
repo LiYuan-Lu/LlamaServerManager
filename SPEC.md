@@ -156,7 +156,7 @@ Agent 必須可以獨立於 GUI 執行。
 
 
 
-第一版使用一般 Windows 背景程式，透過工作排程器啟動；Windows Service 為後續階段。
+第一版使用一般 Windows 背景程式，透過工作排程器啟動；Windows Service 為後續階段。（2026-10 決定：不實作 Windows Service，見 §13 Phase 4。）
 
 
 
@@ -1226,9 +1226,9 @@ LlamaServerManager/
 
 \- 工作排程器自動啟動
 
-\- Windows Service 支援
+\- ~~Windows Service 支援~~（不實作）
 
-\- Agent 權限管理
+\- ~~Agent 權限管理~~（不實作；IPC 已限制只有目前使用者可連線）
 
 \- 安裝及解除安裝
 
@@ -1237,6 +1237,8 @@ LlamaServerManager/
 
 
 Windows Service 必須是獨立服務程序，不能把 GUI 直接當 Windows Service 執行。
+
+（2026-10 決定：本程式定位為單一使用者登入後使用，登入時啟動已滿足需求，因此不實作 Windows Service 與跨使用者的權限管理。Service 只會多出「無人登入時執行」與「多使用者共用」，卻需要另外的服務帳戶（可能無法讀取使用者目錄或對應磁碟機中的模型）、`%PROGRAMDATA%` 資料目錄、安裝與升級時的管理員權限，除錯也較困難。日後若有無人值守或多使用者的需求再重新評估。）
 
 
 
