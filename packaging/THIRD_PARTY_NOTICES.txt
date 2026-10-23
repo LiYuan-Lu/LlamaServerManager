@@ -20,8 +20,10 @@ script could copy them from the Qt installation used for the build.
 
 Microsoft Visual C++ Redistributable (Windows only)
 --------------------------------------------------
-The Windows installer may run Microsoft's Visual C++ Redistributable installer, which is
-distributed under Microsoft's own license terms.
+The Windows installer may run Microsoft's Visual C++ Redistributable installer, and the Windows
+zip package contains the Visual C++ runtime DLLs (vcruntime140*.dll, msvcp140*.dll, and
+related files) next to the executables. Both are distributed under Microsoft's own license
+terms for the Visual C++ Redistributable.
 
 Not included
 ------------

@@ -46,7 +46,9 @@ Turn it on or off in the window's **⋯** menu or the tray menu, or from the com
 
 `cmake --install` produces a runnable folder on every platform; Qt's deployment script (Qt 6.5+) adds the Qt libraries, plugins, and QML modules. The license files are installed next to the program (inside the app bundle on macOS). The GUI is a macOS app bundle with its icon and the Agent built into `Contents/MacOS`; this is prepared but not yet packaged. See [packaging/README.md](../packaging/README.md).
 
-The Windows installer (`packaging/windows/LlamaServerManager.iss`, Inno Setup 6) is built by `packaging/windows/build-installer.ps1`. It installs to Program Files, installs the Visual C++ runtime if needed, offers start at sign-in (on by default, created for the user who ran the installer) and a desktop shortcut, runs `--quit` before upgrading or uninstalling, removes the sign-in task on uninstall, and keeps the user's data. Both executables carry an icon and version information.
+The Windows installer (`packaging/windows/LlamaServerManager.iss`, Inno Setup 6) is built by `packaging/windows/build-installer.ps1`. It installs to Program Files, installs the Visual C++ runtime if needed, offers start at sign-in (on by default, created for the user who ran the installer) and a desktop shortcut, runs `--quit` before upgrading or uninstalling, removes the sign-in task on uninstall, and keeps the user's data. Both executables carry an icon and version information. The same script also produces a zip that runs without installing, with the Visual C++ runtime DLLs next to the executables.
+
+Pushing a version tag (for example `v0.1.0`) runs `.github/workflows/release.yml` on GitHub Actions, which builds, tests, and packages the app and attaches the installer, the zip, and `SHA256SUMS.txt` to a draft release. See [packaging/README.md](../packaging/README.md#releasing).
 
 ## Out of scope
 

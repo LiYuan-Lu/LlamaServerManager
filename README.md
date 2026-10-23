@@ -53,7 +53,9 @@ More detail: [architecture](docs/architecture.md) · [IPC protocol](docs/ipc-pro
 - Optional: an NVIDIA GPU and driver for GPU/VRAM monitoring (NVML ships with the driver). Without it, everything except the GPU tiles works as usual.
 - To build: Qt 6.5+ (MSVC x64), CMake 3.24+, and Visual Studio 2022 or 2026 with the C++ desktop workload; Inno Setup 6 for the installer
 
-There are no prebuilt releases yet. [Build the installer](#build-the-installer) or [build from source](#building-from-source) as shown below.
+Download the installer (`…-setup.exe`) or the zip from [Releases](https://github.com/LiYuan-Lu/LlamaServerManager/releases). The zip needs no installation: extract it anywhere and run `bin\llama-manager.exe`. You can also [build the installer](#build-the-installer) or [build from source](#building-from-source) yourself.
+
+The releases are not code-signed yet, so the first time you run them Windows SmartScreen may show "Windows protected your PC". Click **More info**, then **Run anyway**. `SHA256SUMS.txt` in each release lists the files' checksums.
 
 ## Getting started
 
@@ -128,7 +130,7 @@ The tests need no GPU or model: they use a small fake `llama-server` and a fake 
 
 ### Build the installer
 
-With [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed (`winget install JRSoftware.InnoSetup`), one script builds a Release version, collects the Qt runtime, and produces `packaging\windows\out\LlamaServerManager-<version>-windows-x64-setup.exe`:
+With [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed (`winget install JRSoftware.InnoSetup`), one script builds a Release version, collects the Qt runtime, and produces `packaging\windows\out\LlamaServerManager-<version>-windows-x64-setup.exe` and a zip that runs without installing (`…-windows-x64.zip`, with the Visual C++ runtime DLLs included). Add `-RunTests` to build and run the test suite first:
 
 ```powershell
 .\packaging\windows\build-installer.ps1 -QtRoot $qtRoot

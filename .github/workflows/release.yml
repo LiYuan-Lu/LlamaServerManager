@@ -1,0 +1,113 @@
+# Builds, tests, and packages Llama Server Manager for Windows.
+#
+# - Push a tag that matches the version in CMakeLists.txt (for example v0.1.0): the installer,
+#   the zip, and SHA256SUMS.txt are attached to a draft GitHub release. Review the notes and
+#   publish it on GitHub.
+# - Run the workflow manually (Actions > Release > Run workflow): the same files are uploaded
+#   as a workflow artifact only.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: "6.12.0"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $match = Select-String -Path CMakeLists.txt -Pattern 'project\(LlamaServerManager VERSION ([0-9.]+)'
+          $version = $match.Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match the version in CMakeLists.txt ($version)"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe", "$env:ProgramFiles\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Installing Inno Setup failed" }
+          }
+
+      # Qt installed by aqtinstall has no Licenses folder; ship the LGPL and GPL texts instead.
+      - name: Download Qt license texts
+        shell: pwsh
+        run: |
+          $dir = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP "qt-licenses")
+          Invoke-WebRequest https://www.gnu.org/licenses/lgpl-3.0.txt -OutFile (Join-Path $dir "LICENSE.LGPL3")
+          Invoke-WebRequest https://www.gnu.org/licenses/gpl-3.0.txt -OutFile (Join-Path $dir "LICENSE.GPL3")
+
+      - name: Build, test, and package
+        shell: pwsh
+        run: >
+          .\packaging\windows\build-installer.ps1
+          -QtRoot $env:QT_ROOT_DIR
+          -QtLicenseDir (Join-Path $env:RUNNER_TEMP "qt-licenses")
+          -RunTests
+
+      - name: Write checksums
+        shell: pwsh
+        working-directory: packaging/windows/out
+        run: |
+          Get-ChildItem *.exe, *.zip | Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path -Leaf $_.Path)" } |
+            Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build-release/*-results.txt
+          if-no-files-found: ignore
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: LlamaServerManager-${{ steps.version.outputs.version }}-windows-x64
+          path: |
+            packaging/windows/out/*.exe
+            packaging/windows/out/*.zip
+            packaging/windows/out/SHA256SUMS.txt
+
+      - name: Create draft release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $files = Get-ChildItem packaging/windows/out/*.exe, packaging/windows/out/*.zip, packaging/windows/out/SHA256SUMS.txt |
+            ForEach-Object FullName
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @files --clobber
+          } else {
+            gh release create $tag @files --draft --generate-notes --title "Llama Server Manager $env:VERSION"
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Creating the release failed" }
