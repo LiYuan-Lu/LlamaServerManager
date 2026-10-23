@@ -1,120 +1,187 @@
 # Llama Server Manager
 
-A Windows x64 manager for multiple llama-server instances, built with Qt 6, QML, C++17, and CMake. The GUI and Agent are separate executables. Closing or crashing the GUI does not stop the Agent or model. Each model has a watchdog with HTTP health checks and automatic restarts (Phase 2). The dashboard shows system CPU/RAM, NVIDIA GPU/VRAM, per-model resource usage, and 5-minute charts, and the console has search, level filters, pause, and export (Phase 3). Phase 4 features, including the system tray and Windows Service support, are not implemented.
+**A Windows desktop app for running and supervising local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` instances.**
 
-The Phase 1 implementation passed all seven tests in both Release and Debug builds on Windows. Phase 2 and Phase 3 were tested on Linux only so far; see [docs/testing.md](docs/testing.md). A real 9B GGUF model was also used to verify loading, GUI reconnection, and shutdown. After completing the build and deployment steps below, launch `deploy/llama-manager.exe`.
+Point it at your own `llama-server.exe` and GGUF models, then start, stop, and monitor any number of models from one window. A background Agent keeps them running when the window is closed, restarts crashed or unresponsive servers, and shows CPU, RAM, GPU, and VRAM usage live.
 
-## Build
+![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D6)
+![Qt](https://img.shields.io/badge/Qt-6.5%2B-41CD52)
+![C++](https://img.shields.io/badge/C%2B%2B-17-00599C)
+![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C)
 
-Install Qt 6.5 or later with the MSVC x64 packages for Core, Network, Quick, Quick Controls, Test, and Linguist Tools (included with the standard Qt installation); CMake; the Visual Studio 2026 C++ desktop development workload; and a Windows SDK. The Qt package name `msvc2022_64` does not require the Visual Studio 2022 IDE: this project was built with VS 2026 MSVC. The VS 2026 generator requires a CMake version that supports it.
+![Llama Server Manager dashboard with five models and live CPU, RAM, GPU, and VRAM charts](docs/images/dashboard.png)
 
-Run these commands in PowerShell from the project root. Enter your own Qt MSVC x64 package directory when prompted:
+## Features
 
-```powershell
-$qtRoot = Read-Host "Qt MSVC x64 package directory"
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64 `
-  "-DCMAKE_PREFIX_PATH=$qtRoot"
-cmake --build build --config Release -- /m:1 /nr:false
-$env:PATH = (Join-Path $qtRoot "bin") + ";" + $env:PATH
-ctest --test-dir build -C Release --output-on-failure
-& .\build\Release\llama-manager.exe
+- **Many models, one window** — every model is a card with its state, address, PID, uptime, and one-click Start/Stop and Restart. Each model has its own profile: executable, GGUF file, context size, GPU layers, threads, parallel slots, extra arguments, and environment variables.
+- **Keeps running without the GUI** — models are owned by a separate Agent process. Close the window (or let it crash) and your servers keep serving; reopen it and everything reconnects.
+- **Watchdog** — HTTP health checks on `/health`, crash detection, and automatic restarts with exponential backoff and a restart limit, so a broken model does not restart forever. A manual Stop is always respected. Every failure is kept in a restart history.
+- **Live resource dashboard** — system CPU and RAM plus NVIDIA GPU utilization, VRAM, temperature, and power, each with a 5-minute chart. Every model card also shows that server's own CPU, RAM, and VRAM.
+- **Console** — live stdout/stderr per model with search, Error/Warning/Info filters, pause, copy, and export. Logs are also written to disk with size limits and rotation.
+- **Convenience** — start chosen models automatically with the Agent, duplicate a profile to try other settings, and stop everything with one Stop Agent button.
+- **English and Traditional Chinese** user interface, switchable at any time.
+- **Nothing extra to install** — no Docker, Python, Ollama, or LM Studio. It uses the llama.cpp build and models you already have and never modifies them.
+
+## Screenshots
+
+| Console with level filters | 繁體中文介面 |
+| --- | --- |
+| ![A model's console with search, error/warning/info filters, and llama-server output](docs/images/console.png) | ![The dashboard in Traditional Chinese](docs/images/dashboard-zh-TW.png) |
+
+The screenshots use sample data produced by the test doubles in [`tests/`](tests) (a stand-in server and NVML library), not a real GPU.
+
+## How it works
+
+```text
+llama-manager.exe  ⇄  local named pipe (JSON)  ⇄  llama-manager-agent.exe  ─┬─▶ llama-server.exe  (model A)
+   Qt Quick GUI                                     background Agent         ├─▶ llama-server.exe  (model B)
+                                                                             └─▶ …
 ```
 
-`/m:1 /nr:false` avoids MSBuild worker communication stalls in restricted execution environments. In a normal environment, you can also use `--parallel`. CMake locates Visual Studio automatically; use `-DCMAKE_GENERATOR_INSTANCE` to select an installation if necessary. For VS 2022, use the `Visual Studio 17 2022` generator. Replace `Release` with `Debug` for a debug build.
+- The **GUI** only displays state and sends commands. It starts the Agent if none is running.
+- The **Agent** owns every `llama-server` process (each in its own Windows Job Object), runs the watchdog and resource sampling, and stores profiles, settings, and logs. Only one Agent runs per data directory, and it never touches `llama-server` processes it did not start.
+- Arguments are passed to `llama-server` as a list, never through a shell, so paths with spaces or non-ASCII characters work.
 
-## Usage
+More detail: [architecture](docs/architecture.md) · [IPC protocol](docs/ipc-protocol.md)
 
-The GUI is available in English and Traditional Chinese. On first launch, it follows the Windows display language; use the EN / 中文 button in the top-right corner to switch at any time. The choice is saved per user in `HKEY_CURRENT_USER\Software\LlamaServerManager\llama-manager`.
+## Requirements
 
-1. Launch `llama-manager.exe`. The GUI connects asynchronously and starts `llama-manager-agent.exe` from the same directory if no Agent is available.
-2. The main window is a grid of model cards. Click the **+** card to add a model, or click a card to open its details. Each card has one Start/Stop toggle button and a Restart button, so models can be controlled straight from the grid. In the editor, give the model a name and use the browse buttons to select your `llama-server.exe` and `.gguf` file. Configure the working directory, host, port, context size, GPU layers, threads, parallel slots, and metrics as needed.
-3. Enter extra arguments as a JSON string array, such as `["--verbose"]`. Each element is one argument. Enter environment variables as a JSON object, such as `{"CUDA_VISIBLE_DEVICES":"0"}`. No shell is involved.
-4. Save the profile (or click **Add model** for a new one), then start the server. The Agent first inspects the executable's `--help` output with a 10-second timeout. It rejects startup if required flags are missing. The selected llama.cpp version validates additional arguments; errors appear on stderr.
-5. Inspect the PID, port, uptime, health, stdout, and stderr. With health checks on (the default), a model stays `STARTING` while it loads and becomes `RUNNING` once `GET /health` returns 200. With health checks off, `RUNNING` only means the process has started.
-6. The **System resources** panel at the top of the model grid shows CPU, RAM, GPU, and VRAM with 5-minute charts; GPU values are for the whole card. Each running model card also shows its own CPU, RAM, and VRAM (when the driver reports it). Choose the refresh interval (1–10 s) in the panel. Without an NVIDIA GPU or driver, the GPU tiles show why they are unavailable. See `docs/phase3.md`.
-7. The watchdog restarts a model automatically after a crash, a startup failure, or repeated failed health checks, waiting 5 s, then 10 s, 20 s, … up to 3 times in 10 minutes before giving up (`FAILED`). The **Watchdog** section of each model configures this, and the **Restart history** tab lists every failure and its outcome. Stop first calls terminate, then forcibly ends the owned process if it is still running after three seconds; it always cancels pending automatic restarts.
-8. The **Console** tab of a model shows its stdout/stderr. Search, show or hide errors, warnings, and info lines, pause the view, copy, or export to a file. Clear view only clears the screen; log files stay on disk.
-9. **Duplicate** on a model page opens a new, unsaved model with a copy of its settings, a new name, and the next free port. Check **Start automatically when the Agent starts** to have the Agent start a model every time the Agent starts; a model that cannot start (for example because of a port conflict) is reported as a warning and in its console.
-10. Close the GUI without stopping the Agent or model. Reopening it restores the current state and recent logs retained by the Agent.
+- Windows 10 or 11, x64
+- A `llama-server.exe` from [llama.cpp](https://github.com/ggml-org/llama.cpp) (any backend: CPU, CUDA, Vulkan, …) and one or more `.gguf` models
+- Optional: an NVIDIA GPU and driver for GPU/VRAM monitoring (NVML ships with the driver). Without it, everything except the GPU tiles works as usual.
+- To build: Qt 6.5+ (MSVC x64), CMake 3.24+, and Visual Studio 2022 or 2026 with the C++ desktop workload
 
-The Agent can also run independently as `llama-manager-agent.exe`. Both executables accept `--data-dir <absolute-path>` for isolated testing. Use the same directory for both processes. Do not mix data directories during normal use. To stop the Agent, click **Stop Agent** in the top-right corner: after a confirmation it stops every model (like pressing Stop, so no automatic restarts) and then exits. The window stays open and shows **Start Agent**; the GUI does not relaunch a stopped Agent on its own. Stopping one model, closing the window, and stopping the Agent are separate actions. Do not terminate processes in bulk by executable name.
+There are no prebuilt releases yet; [build from source](#building-from-source) as shown below.
 
-## Data and limitations
+## Getting started
 
-- All model profiles are stored in `%APPDATA%/LlamaServerManager/profiles.json`, using schema version 2 (`{"version":2,"profiles":[...]}`, at most 64 models). A Phase 1 version 1 file is migrated automatically on first Agent start: its single profile becomes one model with a generated ID, and the original file is kept as `.bak`. QSaveFile provides atomic writes. The previous valid version is retained as `.bak`; invalid data falls back to the backup or an empty list with a warning.
-- Agent-wide settings (currently the resource refresh interval) are stored in `settings.json` in the same directory.
-- Logs are stored per model in `logs/<profile-id>/server.jsonl` under the same data directory. Deleting a model deletes its log folder. Each file is limited to 4 MiB, with three rotated files retained, for approximately 16 MiB total. Recent replay is limited to 1,000 records or 256 KiB. GUI text is also bounded. Clearing the view does not delete disk logs.
-- Automatic restarts follow each model's watchdog settings (see `docs/phase2.md`). A manual stop leaves the server stopped. Restart history is kept in `logs/<profile-id>/restart-history.json` (last 50 entries).
-- The single-Agent lock is scoped to the data directory. The named pipe is restricted to the current user; it is not a security boundary against untrusted programs running as that user.
-- A Windows Job Object manages the owned model process and subsequent descendants. If assignment is rejected, the Agent logs a warning and falls back to managing the direct child. See the architecture document for limitations.
-- Starting a model is refused while another active model uses the same port (including wildcard hosts). Several models may run at once; each has its own process, Job Object, and log, and stopping one never affects another. The Agent does not check whether GPU memory is sufficient for all running models.
-- A port preflight check reduces conflicts but cannot eliminate the race before the child binds the port. Actual failures appear through process termination and stderr.
-- Resource monitoring loads NVIDIA NVML (`nvml.dll`, installed with the NVIDIA driver) at runtime; it is not needed to build or run. Per-model VRAM is usually not reported by Windows WDDM drivers and is then shown as n/a.
-- Models and llama-server are not bundled. No Python runtime is required.
+1. Run `llama-manager.exe`. It starts the Agent in the background.
+2. Click the **+** card, give the model a name, and use **Browse…** to select your `llama-server.exe` and `.gguf` file. Adjust the port, context size, GPU layers, and other options, then click **Add model**.
+3. Click **▶ Start** on the card. The Agent checks the executable's `--help` output, launches it, and keeps the model in `STARTING` until `GET /health` answers 200, then shows `RUNNING`.
+4. Point your client at `http://127.0.0.1:<port>` (llama-server's OpenAI-compatible API).
 
-## Translations
+Click a card to open its page with the full profile, the **Console**, and the **Restart history**.
 
-The GUI uses Qt's standard translation workflow. QML strings are marked with `qsTr()`, and translations are stored in `translations/llama-manager_zh_TW.ts`. The build compiles them to `.qm` files with `lrelease` and embeds them in the executable. After adding or changing `qsTr()` strings, refresh the `.ts` file, translate the new entries in Qt Linguist, and rebuild:
+### Everyday use
+
+| You want to… | Do this |
+| --- | --- |
+| Stop one model | Its **■ Stop** button. Pending automatic restarts are cancelled. |
+| Close the window, keep models running | Close the window. Reopen it any time. |
+| Stop all models and the Agent | **Stop Agent** (top right), then confirm. Start it again with **Start Agent**. |
+| Start a model whenever the Agent starts | Check **Start automatically when the Agent starts** in its profile. |
+| Try different settings | **Duplicate** on the model page creates an unsaved copy on the next free port. |
+| Change how often resources refresh | **Refresh every** (1–10 s) above the resource tiles. |
+| Switch language | The **EN / 中文** button. |
+
+Extra arguments are entered as a JSON array (`["--flash-attn", "on"]`) and environment variables as a JSON object (`{"CUDA_VISIBLE_DEVICES": "0"}`). Options the manager sets itself (`-m`, `-c`, `-ngl`, `-t`, `--host`, `--port`, `--parallel`, `--metrics`) cannot be overridden there.
+
+### Watchdog defaults
+
+With the defaults, `/health` is checked every 30 s with a 5 s timeout; 3 failures in a row mark a model `UNHEALTHY`. A model gets 600 s to load. After a crash, a failed start, or failed health checks, it is restarted after 5 s, then 10 s, 20 s, … at most 3 times in 10 minutes before it is left `FAILED`. All of this is configurable per model in its **Watchdog** section; see [docs/phase2.md](docs/phase2.md).
+
+## Data and settings
+
+Everything is stored per user in `%APPDATA%\LlamaServerManager\`:
+
+| Path | Contents |
+| --- | --- |
+| `profiles.json` | Model profiles (up to 64), written atomically with a `.bak` of the previous version |
+| `settings.json` | Agent settings, currently the resource refresh interval |
+| `logs\<profile-id>\server.jsonl` | Console output, 4 MiB per file, 3 rotated files kept |
+| `logs\<profile-id>\restart-history.json` | Last 50 watchdog events |
+
+Deleting a model deletes its log folder; the model file itself is never touched. Clearing the console only clears the screen.
+
+### Notes and limitations
+
+- GPU values on the dashboard are for the **whole GPU**. A model's own VRAM is shown only when the driver reports it; Windows WDDM drivers usually do not, so it reads `VRAM n/a`.
+- Only NVIDIA GPUs are monitored (through NVML). Other GPUs still work with llama.cpp; they are just not shown.
+- The Agent refuses to start a model on a port another running model uses, but it does not check whether there is enough VRAM for all of them.
+- The Agent's named pipe is limited to the current Windows user. It is not a security boundary against other programs running as that user.
+- Log levels in the console are inferred from the text, since llama.cpp does not label its output.
+
+## Building from source
+
+Install Qt 6.5 or later with the **MSVC x64** components (Core, Network, Quick, Quick Controls, Test, Linguist Tools), CMake, and Visual Studio with the *Desktop development with C++* workload and a Windows SDK. In PowerShell, from the project root:
+
+```powershell
+$qtRoot = Read-Host "Qt MSVC x64 package directory"   # e.g. C:\Qt\6.8.0\msvc2022_64
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64 "-DCMAKE_PREFIX_PATH=$qtRoot"
+cmake --build build --config Release --parallel
+```
+
+Use the `Visual Studio 17 2022` generator for VS 2022. If MSBuild stalls in a restricted environment, build with `-- /m:1 /nr:false` instead of `--parallel`.
+
+### Run the tests
+
+```powershell
+$env:PATH = (Join-Path $qtRoot "bin") + ";" + $env:PATH
+ctest --test-dir build -C Release --output-on-failure
+```
+
+The tests need no GPU or model: they use a small fake `llama-server` and a fake NVML library. See [docs/testing.md](docs/testing.md) for what is covered, the recorded results, and how to run the optional test against a real model.
+
+### Create a runnable folder
+
+Keep both executables in the same folder and let `windeployqt` add the Qt runtime:
+
+```powershell
+New-Item -ItemType Directory -Force deploy | Out-Null
+Copy-Item build\Release\llama-manager.exe, build\Release\llama-manager-agent.exe deploy
+& (Join-Path $qtRoot "bin\windeployqt.exe") --release --qmldir apps\gui\qml deploy\llama-manager.exe
+& (Join-Path $qtRoot "bin\windeployqt.exe") --release deploy\llama-manager-agent.exe
+```
+
+The target computer needs the Microsoft Visual C++ x64 Redistributable. If `windeployqt` cannot find Visual Studio, run it from a *Developer PowerShell for VS* or add `--compiler-runtime` with `$env:VCINSTALLDIR` set.
+
+### Translations
+
+UI strings use Qt's `qsTr()`; translations live in [`translations/`](translations). After changing strings, refresh and edit them, then rebuild:
 
 ```powershell
 cmake --build build --target llama-manager_lupdate
 & (Join-Path $qtRoot "bin\linguist.exe") translations\llama-manager_zh_TW.ts
 ```
 
-To add a language, add its `.ts` file to `qt_add_translations` in `CMakeLists.txt` and list it in `apps/gui/LanguageManager.cpp`. Qt's own strings, such as standard dialog buttons, come from the Qt translation files that windeployqt copies into `deploy/translations`.
+To add a language, add its `.ts` file to `qt_add_translations` in `CMakeLists.txt` and list it in `apps/gui/LanguageManager.cpp`.
 
-## Development deployment
-
-Keep both executables in the same directory. These commands create a runnable local folder. Installers, CPack packaging, Task Scheduler integration, and Windows Service support remain Phase 4 work.
-
-Use the `$qtRoot` value from the build instructions:
-
-```powershell
-New-Item -ItemType Directory -Force deploy | Out-Null
-Copy-Item build\Release\llama-manager.exe,build\Release\llama-manager-agent.exe deploy
-& (Join-Path $qtRoot "bin\windeployqt.exe") --release --qmldir apps\gui\qml deploy\llama-manager.exe
-& (Join-Path $qtRoot "bin\windeployqt.exe") --release deploy\llama-manager-agent.exe
-```
-
-The target computer needs a compatible MSVC x64 Redistributable. Do not distribute the Debug CRT.
-
-If windeployqt cannot locate Visual Studio, run it from a Visual Studio Developer PowerShell, or set `$env:VCINSTALLDIR` to your Visual Studio `VC` directory and add `--compiler-runtime`. The resulting redistributable installer is not run automatically.
-
-## Project structure
+## Project layout
 
 ```text
-apps/agent/main.cpp           Agent entry point and single-instance lock
-apps/gui/main.cpp             QML entry point and AgentClient injection
-apps/gui/LanguageManager.*    Runtime language switching with QTranslator
-apps/gui/qml/Main.qml         Model grid (cards + add button) and page navigation
-apps/gui/qml/ModelCard.qml    One model's status with Start/Stop toggle and Restart
-apps/gui/qml/ModelPage.qml    Model detail: controls, profile editor, logs, restart history, delete
-apps/gui/qml/ProfileEditor.qml  Paths, arguments, and file dialogs
-apps/gui/qml/LogView.qml       Console: search, level filters, pause, copy, export
-apps/gui/qml/ResourcePanel.qml System resources dashboard (CPU, RAM, GPU, VRAM)
-apps/gui/qml/MetricTile.qml    One dashboard tile with a chart
-apps/gui/qml/LineChart.qml     Canvas time-series chart
-apps/gui/qml/UsageLabel.qml    CPU/RAM/VRAM of one model process
-core/Profile.*               Data types, validation, and argument arrays
-core/ProfileStore.*          Atomic persistence and backup recovery
-core/LlamaProcessManager.*    Asynchronous QProcess lifecycle and state
-core/ServerSupervisor.*       Per-model watchdog state machine and restart history
-core/HealthMonitor.*          Asynchronous GET /health polling
-core/RestartPolicy.*          Restart limits, cooldown, and exponential backoff
-core/LogStore.*               Bounded replay and disk rotation
-core/SystemMonitor.*          System and per-process CPU/RAM
-core/GpuMonitor.*             NVIDIA GPUs through runtime-loaded NVML
-core/MetricsCollector.*       Sampling thread and 5-minute history
-core/AppSettings.*            settings.json
-ipc/Protocol.*               Framing, versioning, and size limits
-ipc/AgentServer.*            Commands and status/log events
-ipc/AgentClient.*            Asynchronous connection, retries, and timeouts
-ipc/LogModel.*               Console lines: levels, filters, pause, export
-tests/FakeServer.cpp         Controllable console child process
-tests/FakeNvml.cpp           Stand-in NVML library for GPU tests
-tests/Tests.cpp              Qt Test and cross-process integration tests
-translations/                Qt Linguist translation sources (.ts)
-docs/                       Architecture, protocol, testing, and roadmap
+apps/gui/       Qt Quick GUI (QML pages and components, language switching)
+apps/agent/     Agent entry point and single-instance lock
+core/           Profiles, process management, watchdog, health checks, resource monitors
+ipc/            JSON protocol, Agent server, GUI client, console model
+tests/          Qt Test suite, fake llama-server, fake NVML library
+translations/   Qt Linguist sources
+docs/           Design and test documentation
 ```
 
-See [docs/testing.md](docs/testing.md) for recorded results and unverified areas, [docs/phase2.md](docs/phase2.md) for the watchdog, and [docs/phase3.md](docs/phase3.md) for the dashboard and console.
+| Document | About |
+| --- | --- |
+| [SPEC.md](SPEC.md) | Original specification (Traditional Chinese) |
+| [docs/architecture.md](docs/architecture.md) | Processes, states, ownership, and limits |
+| [docs/ipc-protocol.md](docs/ipc-protocol.md) | GUI ⇄ Agent messages |
+| [docs/phase2.md](docs/phase2.md) | Watchdog and restart policy |
+| [docs/phase3.md](docs/phase3.md) | Resource monitoring and console |
+| [docs/testing.md](docs/testing.md) | Test coverage and results |
+
+## Roadmap
+
+Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), plus profile duplication, auto start, and Stop Agent.
+
+Next, Windows integration (Phase 4):
+
+- System tray icon with status and Start/Stop/Restart
+- Start the Agent at sign-in through Task Scheduler
+- Optional Windows Service for the Agent
+- Installer, uninstaller, and release packages
+
+## Contributing
+
+Issues and pull requests are welcome. Please:
+
+- Format C++ with the repository's `.clang-format` (WebKit style) and **always use braces**, even for one-line `if` bodies — see [AGENTS.md](AGENTS.md).
+- Write commit messages in [Conventional Commits](https://www.conventionalcommits.org/) style (`feat:`, `fix:`, `docs:` …).
+- Run the test suite before opening a pull request, and add tests for new behavior.
