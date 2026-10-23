@@ -146,7 +146,7 @@ Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1�
 
 # Phase 4（第一部分）測試紀錄：系統匣、登入時啟動、安裝程式
 
-測試環境同上（Ubuntu 24.04、Qt 6.4.2）。**尚未在 Windows 或 macOS 上執行；Inno Setup 安裝程式與 PowerShell 建置腳本也尚未執行。**
+Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分由使用者在 Windows 上手動驗證（Qt 6.12.0 msvc2022_64、Inno Setup 6.7.3）。**尚未在 macOS 上執行。**
 
 ## 已執行
 
@@ -156,7 +156,19 @@ Watchdog 測試透過 `ServerSupervisor::setTimeScale(100)`，把設定中的 1�
 - 在 Xvfb + openbox + stalonetray 的真實 X11 桌面上手動檢查系統匣：圖示與綠色狀態點、選單（顯示/隱藏視窗、狀態、每個模型的子選單、開啟日誌資料夾、登入時啟動、停止 Agent、結束）、按關閉鈕後視窗隱藏但 GUI 繼續執行、左鍵切換視窗、第二次啟動叫回視窗、`--quit` 結束；勾選「隨 Agent 啟動」的模型會自動啟動。
 - `cmake --install` 安裝規則（Linux）：執行檔與授權檔安裝正確。Qt 部署腳本需要 Qt 6.5，本機 Qt 6.4 會略過。
 
+## Windows 手動驗證
+
+- 登入時啟動：在 GUI 勾選後成功建立工作排程，登出再登入後程式會自動啟動。
+- `packaging/windows/build-installer.ps1`：建置、`cmake --install`（windeployqt 部署 Qt 執行環境）與 Inno Setup 編譯成功，產生 setup.exe。
+- 安裝程式的工作選項頁：核取方塊在顯示縮放大於 100% 時能完整顯示。
+
+## Windows 上發現並修正
+
+- 勾選登入時啟動出現「Cannot create the sign-in task: 程序無法存取檔案，因為檔案正由另一個程序使用」：Windows 上的 `QTemporaryFile` 在 `close()` 後仍以獨佔方式佔用檔案，`schtasks.exe /XML` 無法讀取。改為寫入一般檔案並完全關閉，`schtasks.exe` 結束後再刪除。
+- `build-installer.ps1` 找不到 `...\packaging\windows\G`：PowerShell 管線只有一個結果時會變成字串，`$licenseDirs[0]` 取到的是第一個字元。改用 `Select-Object -First 1` 直接取得路徑。
+- 安裝程式的核取方塊在高 DPI 下被切掉：Inno Setup 的 `TNewCheckListBox` 只替核取方塊預留 13 px，卻依 DPI 畫出放大的主題核取方塊（6.5.4 到 7.1.0 都有此問題，升級無效；`WizardStyle` 的 `excludelightcontrols` 也無效）。在 `InitializeWizard` 依縮放比例加寬工作清單與完成頁清單的 `Offset`。
+
 ## 尚未驗證
 
-- Windows：`schtasks.exe` 建立／查詢／刪除工作（含一般使用者權限）、登入後實際啟動、通知區域圖示與選單、`--quit` 搭配安裝程式、Inno Setup 編譯與安裝／升級／移除流程、Visual C++ 執行階段安裝、`.rc` 圖示與版本資訊、`cmake --install` 的 windeployqt 部署。
+- Windows：系統匣圖示與選單、安裝／升級／移除流程（含 `--quit` 關閉執行中的程式、移除時刪除登入工作）、Visual C++ 執行階段安裝、`.rc` 圖示與版本資訊。
 - macOS：app bundle、選單列單色圖示、LaunchAgent 登入啟動（目前只測試了 plist 的內容與讀寫）。
