@@ -394,6 +394,8 @@ private slots:
         QVERIFY(history["ok"].toBool()); QVERIFY(history["data"].toObject()["entries"].isArray());
         QCOMPARE(status["health"].toString(), QString("Healthy"));
         QVERIFY(!rpc(socket, "deleteProfile", {{"profileId", id}})["ok"].toBool()); // active models cannot be deleted
+        QVERIFY(!rpc(socket, "updateProfile", {{"profileId", id}, {"profile", p.toJson()}})["ok"].toBool()); // nor edited
+        QVERIFY(!rpc(socket, "getLogs", {{"profileId", "missing"}})["error"].toString().isEmpty());
         // A second model on another port runs alongside the first; a third on the same port is refused.
         auto p2 = profile(dir.path()); p2.name = "Second";
         const auto id2 = rpc(socket, "createProfile", {{"profile", p2.toJson()}})["data"].toObject()["id"].toString();
@@ -402,6 +404,16 @@ private slots:
         const auto clashId = rpc(socket, "createProfile", {{"profile", clash.toJson()}})["data"].toObject()["id"].toString();
         const auto refused = rpc(socket, "startServer", {{"profileId", clashId}});
         QVERIFY(!refused["ok"].toBool()); QVERIFY(refused["error"].toString().contains(QString::number(p.port)));
+        // Stopped models can be edited; the ID is kept and the name defaults to the model file name.
+        auto renamed = clash; renamed.name = ""; renamed.context = 1024;
+        const auto updated = rpc(socket, "updateProfile", {{"profileId", clashId}, {"profile", renamed.toJson()}});
+        QVERIFY2(updated["ok"].toBool(), qPrintable(updated["error"].toString()));
+        const auto listed = rpc(socket, "listProfiles")["data"].toObject()["profiles"].toArray();
+        QCOMPARE(listed.size(), 3);
+        QCOMPARE(listed[2].toObject()["id"].toString(), clashId);
+        QCOMPARE(listed[2].toObject()["context"].toInt(), 1024);
+        QCOMPARE(listed[2].toObject()["name"].toString(), QString("測試 model"));
+        QVERIFY(!rpc(socket, "updateProfile", {{"profileId", clashId}})["ok"].toBool()); // missing profile object
         QVERIFY(rpc(socket, "deleteProfile", {{"profileId", clashId}})["ok"].toBool());
         QVERIFY(rpc(socket, "startServer", {{"profileId", id2}})["ok"].toBool());
         QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id2)["state"].toString(), "RUNNING", 10000);

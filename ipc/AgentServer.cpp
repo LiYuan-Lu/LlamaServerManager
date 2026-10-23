@@ -113,52 +113,100 @@ void AgentServer::receive(QLocalSocket *socket) {
     }
     if (clients.contains(socket)) clients[socket] = buffer;
 }
+const QHash<QString, AgentServer::CommandSpec> &AgentServer::commands() {
+    static const QHash<QString, CommandSpec> table = {
+        {"getStatus",         {Command::GetStatus, false}},
+        {"listProfiles",      {Command::ListProfiles, false}},
+        {"getLogs",           {Command::GetLogs, true}},
+        {"getRestartHistory", {Command::GetRestartHistory, true}},
+        {"createProfile",     {Command::CreateProfile, false}},
+        {"updateProfile",     {Command::UpdateProfile, true}},
+        {"deleteProfile",     {Command::DeleteProfile, true}},
+        {"startServer",       {Command::StartServer, true}},
+        {"stopServer",        {Command::StopServer, true}},
+        {"restartServer",     {Command::RestartServer, true}},
+    };
+    return table;
+}
 void AgentServer::command(QLocalSocket *socket, const QJsonObject &m) {
-    const QString id = m["id"].toString(), cmd = m["command"].toString(), profileId = m["profileId"].toString();
-    QString error; QJsonObject data;
+    const QString id = m["id"].toString();
     if (id.isEmpty() || id.size() > 128) { socket->abort(); return; }
-    const bool needsInstance = cmd == "getLogs" || cmd == "getRestartHistory" || cmd == "updateProfile" || cmd == "deleteProfile"
-        || cmd == "startServer" || cmd == "stopServer" || cmd == "restartServer";
-    Instance *instance = needsInstance ? find(profileId) : nullptr;
-    if (needsInstance && !instance) error = profileId.isEmpty() ? "Missing profileId" : "Unknown profile: " + profileId;
-    else if (cmd == "getStatus") data = snapshot();
-    else if (cmd == "listProfiles") {
-        QJsonArray list; for (const auto &p : profiles()) list.append(p.toJson());
-        data = {{"profiles", list}};
-    } else if (cmd == "getLogs") data = {{"profileId", profileId}, {"entries", instance->logs->snapshot()}};
-    else if (cmd == "getRestartHistory") data = {{"profileId", profileId}, {"entries", instance->manager->history()}};
-    else if (cmd == "createProfile") {
-        Profile candidate;
-        if (!m["profile"].isObject()) error = "Missing profile object";
-        else if (Profile::fromJson(m["profile"].toObject(), candidate, error)) {
-            candidate.id = Profile::newId();
-            if (candidate.name.trimmed().isEmpty()) candidate.name = candidate.displayName();
-            auto list = profiles(); list << candidate;
-            if (persist(list, error)) {
-                add(candidate); data = snapshot(); broadcast("status", data); data["id"] = candidate.id;
-            }
-        }
-    } else if (cmd == "updateProfile") {
-        Profile candidate;
-        if (instance->manager->active()) error = "Stop the server before changing its profile";
-        else if (!m["profile"].isObject()) error = "Missing profile object";
-        else if (Profile::fromJson(m["profile"].toObject(), candidate, error)) {
-            candidate.id = profileId;
-            if (candidate.name.trimmed().isEmpty()) candidate.name = candidate.displayName();
-            auto list = profiles(); list[instances.indexOf(instance)] = candidate;
-            if (persist(list, error)) { instance->profile = candidate; data = snapshot(); broadcast("status", data); }
-        }
-    } else if (cmd == "deleteProfile") {
-        if (instance->manager->active()) error = "Stop the server before deleting this model";
-        else {
-            auto list = profiles(); list.removeAt(instances.indexOf(instance));
-            if (persist(list, error)) { remove(instance); data = snapshot(); broadcast("status", data); }
-        }
-    } else if (cmd == "startServer" || cmd == "restartServer") {
-        error = instance->manager->active() && cmd == "restartServer" ? QString() : portConflict(instance);
-        if (error.isEmpty())
-            error = cmd == "startServer" ? instance->manager->start(instance->profile) : instance->manager->restart(instance->profile);
-    } else if (cmd == "stopServer") error = instance->manager->stop();
-    else error = "Unknown or unavailable command: " + cmd;
-    Protocol::send(socket, {{"version", 1}, {"id", id}, {"ok", error.isEmpty()}, {"error", error}, {"data", data}});
+    const auto reply = execute(m);
+    Protocol::send(socket, {{"version", 1}, {"id", id}, {"ok", reply.error.isEmpty()}, {"error", reply.error}, {"data", reply.data}});
+}
+AgentServer::Reply AgentServer::execute(const QJsonObject &m) {
+    const QString name = m["command"].toString();
+    const auto spec = commands().constFind(name);
+    if (spec == commands().cend()) return Reply::failure("Unknown or unavailable command: " + name);
+    Instance *instance = nullptr;
+    if (spec->targetsProfile) {
+        const QString profileId = m["profileId"].toString();
+        instance = find(profileId);
+        if (!instance) return Reply::failure(profileId.isEmpty() ? "Missing profileId" : "Unknown profile: " + profileId);
+    }
+    switch (spec->command) {
+    case Command::GetStatus:         return Reply::success(snapshot());
+    case Command::ListProfiles:      return listProfiles();
+    case Command::GetLogs:           return Reply::success({{"profileId", instance->profile.id}, {"entries", instance->logs->snapshot()}});
+    case Command::GetRestartHistory: return Reply::success({{"profileId", instance->profile.id}, {"entries", instance->manager->history()}});
+    case Command::CreateProfile:     return createProfile(m);
+    case Command::UpdateProfile:     return updateProfile(instance, m);
+    case Command::DeleteProfile:     return deleteProfile(instance);
+    case Command::StartServer:       return startServer(instance, false);
+    case Command::RestartServer:     return startServer(instance, true);
+    case Command::StopServer:        return Reply{instance->manager->stop(), {}};
+    }
+    return Reply::failure("Unhandled command: " + name); // every enum value is handled above
+}
+QJsonObject AgentServer::publishSnapshot() {
+    const auto data = snapshot();
+    broadcast("status", data);
+    return data;
+}
+bool AgentServer::parseProfile(const QJsonObject &m, Profile &profile, QString &error) {
+    if (!m["profile"].isObject()) { error = "Missing profile object"; return false; }
+    if (!Profile::fromJson(m["profile"].toObject(), profile, error)) return false;
+    if (profile.name.trimmed().isEmpty()) profile.name = profile.displayName();
+    return true;
+}
+AgentServer::Reply AgentServer::listProfiles() const {
+    QJsonArray list;
+    for (const auto &p : profiles()) list.append(p.toJson());
+    return Reply::success({{"profiles", list}});
+}
+AgentServer::Reply AgentServer::createProfile(const QJsonObject &m) {
+    Profile candidate; QString error;
+    if (!parseProfile(m, candidate, error)) return Reply::failure(error);
+    candidate.id = Profile::newId(); // client-supplied IDs are ignored
+    auto list = profiles(); list << candidate;
+    if (!persist(list, error)) return Reply::failure(error);
+    add(candidate);
+    auto data = publishSnapshot(); data["id"] = candidate.id;
+    return Reply::success(data);
+}
+AgentServer::Reply AgentServer::updateProfile(Instance *instance, const QJsonObject &m) {
+    if (instance->manager->active()) return Reply::failure("Stop the server before changing its profile");
+    Profile candidate; QString error;
+    if (!parseProfile(m, candidate, error)) return Reply::failure(error);
+    candidate.id = instance->profile.id;
+    auto list = profiles(); list[instances.indexOf(instance)] = candidate;
+    if (!persist(list, error)) return Reply::failure(error);
+    instance->profile = candidate;
+    return Reply::success(publishSnapshot());
+}
+AgentServer::Reply AgentServer::deleteProfile(Instance *instance) {
+    if (instance->manager->active()) return Reply::failure("Stop the server before deleting this model");
+    QString error;
+    auto list = profiles(); list.removeAt(instances.indexOf(instance));
+    if (!persist(list, error)) return Reply::failure(error);
+    remove(instance);
+    return Reply::success(publishSnapshot());
+}
+AgentServer::Reply AgentServer::startServer(Instance *instance, bool restart) {
+    // Restarting an active model keeps its own port, so only a fresh start can conflict.
+    if (!restart || !instance->manager->active()) {
+        if (const auto conflict = portConflict(instance); !conflict.isEmpty()) return Reply::failure(conflict);
+    }
+    auto *supervisor = instance->manager;
+    return Reply{restart ? supervisor->restart(instance->profile) : supervisor->start(instance->profile), {}};
 }

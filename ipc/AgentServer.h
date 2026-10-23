@@ -18,8 +18,33 @@ private:
         ServerSupervisor *manager = nullptr;
         LogStore *logs = nullptr;
     };
+    enum class Command {
+        GetStatus, ListProfiles, GetLogs, GetRestartHistory,
+        CreateProfile, UpdateProfile, DeleteProfile,
+        StartServer, StopServer, RestartServer,
+    };
+    struct CommandSpec {
+        Command command;
+        bool targetsProfile; // requires a valid "profileId"
+    };
+    struct Reply {
+        QString error;
+        QJsonObject data;
+        static Reply success(const QJsonObject &data = {}) { return {{}, data}; }
+        static Reply failure(const QString &error) { return {error, {}}; }
+    };
+    static const QHash<QString, CommandSpec> &commands();
     void receive(QLocalSocket *socket);
     void command(QLocalSocket *socket, const QJsonObject &message);
+    Reply execute(const QJsonObject &message);
+    Reply listProfiles() const;
+    Reply createProfile(const QJsonObject &message);
+    Reply updateProfile(Instance *instance, const QJsonObject &message);
+    Reply deleteProfile(Instance *instance);
+    Reply startServer(Instance *instance, bool restart);
+    static bool parseProfile(const QJsonObject &message, Profile &profile, QString &error);
+    // Broadcasts the new state after a profile change and returns it for the reply.
+    QJsonObject publishSnapshot();
     void broadcast(const QString &event, const QJsonObject &data);
     QJsonObject snapshot() const;
     Instance *find(const QString &id) const;
