@@ -17,6 +17,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
 #include <QTextStream>
 #include <QTimer>
 #include <algorithm>
@@ -147,6 +148,13 @@ int main(int argc, char** argv)
     }
 
     QQuickStyle::setStyle("Fusion");
+    // Software rendering: no GPU driver involved (some drivers made the desktop flicker on
+    // hover), no VRAM taken from the models, and no stutter while inference keeps the GPU
+    // busy. The UI is simple enough for the CPU. Setting QSG_RHI_BACKEND (for example
+    // "d3d11" or "opengl") or QT_QUICK_BACKEND still chooses another renderer.
+    if (qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") && qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND")) {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
+    }
     AgentClient client(directory);
     LoginStartup startup(loginEntry(parser));
     TrayIcon tray(&client, &startup, QDir(directory).filePath("logs"));
