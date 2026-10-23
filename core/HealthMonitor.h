@@ -1,6 +1,6 @@
 #pragma once
-#include <QObject>
 #include <QNetworkAccessManager>
+#include <QObject>
 #include <QTimer>
 #include <QUrl>
 
@@ -12,23 +12,26 @@ class QNetworkReply;
 class HealthMonitor : public QObject {
     Q_OBJECT
 public:
-    enum class Outcome { Healthy, Loading, Failure };
+    enum class Outcome { Healthy,
+        Loading,
+        Failure };
     Q_ENUM(Outcome)
-    explicit HealthMonitor(QObject *parent = nullptr);
+    explicit HealthMonitor(QObject* parent = nullptr);
     ~HealthMonitor() override;
-    void start(quint64 generation, const QString &host, int port, int intervalMs, int timeoutMs, int firstDelayMs = 0);
+    void start(quint64 generation, const QString& host, int port, int intervalMs, int timeoutMs, int firstDelayMs = 0);
     void setInterval(int intervalMs) { interval = intervalMs; }
     void stop();
     bool running() const { return active; }
     bool requestInFlight() const { return reply != nullptr; }
-    static QString checkHost(const QString &host);
+    static QString checkHost(const QString& host);
 signals:
-    void result(quint64 generation, HealthMonitor::Outcome outcome, int httpStatus, const QString &detail);
+    void result(quint64 generation, HealthMonitor::Outcome outcome, int httpStatus, const QString& detail);
+
 private:
     void check();
     QNetworkAccessManager network;
     QTimer timer;
-    QNetworkReply *reply = nullptr;
+    QNetworkReply* reply = nullptr;
     QUrl url;
     quint64 generation = 0;
     int interval = 30000, timeout = 5000;

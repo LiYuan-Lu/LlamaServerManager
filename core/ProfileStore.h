@@ -8,8 +8,9 @@ public:
     static constexpr int MaxProfiles = 64;
     explicit ProfileStore(QString directory);
     // `changed` is set when IDs were assigned or the file was migrated and should be saved.
-    QList<Profile> load(QString &warning, bool *changed = nullptr) const;
-    bool save(const QList<Profile> &, QString &error);
+    QList<Profile> load(QString& warning, bool* changed = nullptr) const;
+    bool save(const QList<Profile>&, QString& error);
+
 private:
     QString path;
 };

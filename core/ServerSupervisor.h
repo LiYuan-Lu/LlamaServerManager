@@ -1,9 +1,9 @@
 #pragma once
-#include "LlamaProcessManager.h"
 #include "HealthMonitor.h"
+#include "LlamaProcessManager.h"
 #include "RestartPolicy.h"
-#include <QJsonArray>
 #include <QElapsedTimer>
+#include <QJsonArray>
 
 // Watchdog for one model. Wraps LlamaProcessManager (process lifecycle) with HealthMonitor
 // and RestartPolicy, and exposes the extended state machine:
@@ -15,11 +15,11 @@ class ServerSupervisor : public QObject {
 public:
     static constexpr int MaxHistory = 50;
     // historyPath may be empty (no persistence).
-    ServerSupervisor(const QString &profileId, const QString &historyPath, QObject *parent = nullptr);
+    ServerSupervisor(const QString& profileId, const QString& historyPath, QObject* parent = nullptr);
     ~ServerSupervisor() override;
-    QString start(const Profile &profile);
+    QString start(const Profile& profile);
     QString stop();
-    QString restart(const Profile &profile);
+    QString restart(const Profile& profile);
     QJsonObject status() const;
     QJsonArray history() const { return entries; }
     QString state() const { return current; }
@@ -29,19 +29,26 @@ public:
     static void setTimeScale(int millisecondsPerSecond);
 signals:
     void changed();
-    void log(const QString &channel, const QString &text);
+    void log(const QString& channel, const QString& text);
     void historyChanged();
+
 private:
-    enum class Failure { Crash, Startup, Health };
-    enum class AfterStop { None, Manual, ManualRestart, AutoRestart, GiveUp };
+    enum class Failure { Crash,
+        Startup,
+        Health };
+    enum class AfterStop { None,
+        Manual,
+        ManualRestart,
+        AutoRestart,
+        GiveUp };
     void onManagerChanged();
-    void onHealth(quint64 generation, HealthMonitor::Outcome outcome, int status, const QString &detail);
-    void fail(Failure kind, const QString &reason);
+    void onHealth(quint64 generation, HealthMonitor::Outcome outcome, int status, const QString& detail);
+    void fail(Failure kind, const QString& reason);
     void beginRetry();
     void retryNow();
-    void setState(const QString &state, const QString &error = {});
-    void record(Failure kind, const QString &reason, int attempt, const QString &outcome);
-    void resolvePending(const QString &outcome);
+    void setState(const QString& state, const QString& error = { });
+    void record(Failure kind, const QString& reason, int attempt, const QString& outcome);
+    void resolvePending(const QString& outcome);
     void loadHistory();
     void saveHistory();
     void configurePolicy();

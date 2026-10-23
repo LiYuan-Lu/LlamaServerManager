@@ -14,24 +14,24 @@ class LanguageManager : public QObject {
     Q_PROPERTY(QString language READ language NOTIFY languageChanged)
 
 public:
-    explicit LanguageManager(QObject *parent = nullptr);
+    explicit LanguageManager(QObject* parent = nullptr);
 
     QString language() const { return m_language; }
-    void setEngine(QQmlEngine *engine) { m_engine = engine; }
+    void setEngine(QQmlEngine* engine) { m_engine = engine; }
 
     // Accepts "en" or "zh_TW"; persists the choice and retranslates QML.
-    Q_INVOKABLE void setLanguage(const QString &language);
+    Q_INVOKABLE void setLanguage(const QString& language);
 
 signals:
     void languageChanged();
 
 private:
-    void apply(const QString &language);
-    static QString normalized(const QString &language);
+    void apply(const QString& language);
+    static QString normalized(const QString& language);
     static QString systemDefault();
 
     QString m_language;
     QTranslator m_appTranslator;
     QTranslator m_qtTranslator;
-    QQmlEngine *m_engine = nullptr;
+    QQmlEngine* m_engine = nullptr;
 };
