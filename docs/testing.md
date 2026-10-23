@@ -161,6 +161,9 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 - 登入時啟動：在 GUI 勾選後成功建立工作排程，登出再登入後程式會自動啟動。
 - `packaging/windows/build-installer.ps1`：建置、`cmake --install`（windeployqt 部署 Qt 執行環境）與 Inno Setup 編譯成功，產生 setup.exe。
 - 安裝程式的工作選項頁：核取方塊在顯示縮放大於 100% 時能完整顯示。
+- 通知區域的系統匣圖示與選單。
+- 安裝、升級、移除的完整流程。
+- `llama-manager.exe` 與 `llama-manager-agent.exe` 的圖示與版本資訊（`.rc` 資源）。
 
 ## Windows 上發現並修正
 
@@ -170,5 +173,5 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 
 ## 尚未驗證
 
-- Windows：系統匣圖示與選單、安裝／升級／移除流程（含 `--quit` 關閉執行中的程式、移除時刪除登入工作）、Visual C++ 執行階段安裝、`.rc` 圖示與版本資訊。
+- Windows：在尚未安裝 Visual C++ 執行階段的電腦上由安裝程式自動安裝。
 - macOS：app bundle、選單列單色圖示、LaunchAgent 登入啟動（目前只測試了 plist 的內容與讀寫）。
