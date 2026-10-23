@@ -8,6 +8,7 @@ Point it at your own `llama-server.exe` and GGUF models, then start, stop, and m
 ![Qt](https://img.shields.io/badge/Qt-6.5%2B-41CD52)
 ![C++](https://img.shields.io/badge/C%2B%2B-17-00599C)
 ![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ![Llama Server Manager dashboard with five models and live CPU, RAM, GPU, and VRAM charts](docs/images/dashboard.png)
 
@@ -185,3 +186,9 @@ Issues and pull requests are welcome. Please:
 - Format C++ with the repository's `.clang-format` (WebKit style) and **always use braces**, even for one-line `if` bodies — see [AGENTS.md](AGENTS.md).
 - Write commit messages in [Conventional Commits](https://www.conventionalcommits.org/) style (`feat:`, `fix:`, `docs:` …).
 - Run the test suite before opening a pull request, and add tests for new behavior.
+
+## License
+
+Llama Server Manager is released under the [MIT License](LICENSE).
+
+It is built with [Qt](https://www.qt.io/), which is used under the GNU LGPL v3 and linked dynamically; release packages must include Qt's license notices. llama.cpp and model files are not included and keep their own licenses.
