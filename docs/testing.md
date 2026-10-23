@@ -171,6 +171,9 @@ Linux 部分的測試環境同上（Ubuntu 24.04、Qt 6.4.2）；Windows 部分�
 - 勾選登入時啟動出現「Cannot create the sign-in task: 程序無法存取檔案，因為檔案正由另一個程序使用」：Windows 上的 `QTemporaryFile` 在 `close()` 後仍以獨佔方式佔用檔案，`schtasks.exe /XML` 無法讀取。改為寫入一般檔案並完全關閉，`schtasks.exe` 結束後再刪除。
 - `build-installer.ps1` 找不到 `...\packaging\windows\G`：PowerShell 管線只有一個結果時會變成字串，`$licenseDirs[0]` 取到的是第一個字元。改用 `Select-Object -First 1` 直接取得路徑。
 - 安裝程式的核取方塊在高 DPI 下被切掉：Inno Setup 的 `TNewCheckListBox` 只替核取方塊預留 13 px，卻依 DPI 畫出放大的主題核取方塊（6.5.4 到 7.1.0 都有此問題，升級無效；`WizardStyle` 的 `excludelightcontrols` 也無效）。在 `InitializeWizard` 依縮放比例加寬工作清單與完成頁清單的 `Offset`。
+- 以 `ctest` 執行時所有測試都以 `0xc0000135`（找不到 DLL）結束：在 Qt Creator 外 Qt 的 DLL 不在 PATH 上。`CMakeLists.txt` 在 Windows 上以 `ENVIRONMENT_MODIFICATION` 把 Qt 的 bin 資料夾加到每個測試的 PATH 前面。
+- `loginStartup` 在 Windows 上失敗（「存取被拒」）：`FileBackend::query()` 在檔案仍開啟時呼叫 `done()`，而 `refresh()` 會在其中以 `QSaveFile` 改寫同一個檔案，Windows 不允許取代開啟中的檔案。改為讀完即關閉檔案。測試也會印出 `error()` 的內容。
+- `watchdogHealthRestart` 偶爾失敗：第一次啟動假 llama-server 時（防毒掃描新執行檔）進入 RUNNING 需要約 5.5 秒，超過測試的 5 秒。放寬為 10 秒。
 
 ## 尚未驗證
 

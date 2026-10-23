@@ -425,7 +425,9 @@ private slots:
             }
         });
         QVERIFY(supervisor.start(p).isEmpty());
-        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 5000);
+        // Generous: a slow or busy machine (CI runners, virus scanning a new process) may take
+        // several seconds to answer the first /health.
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("RUNNING"), 10000);
         const auto firstPid = supervisor.status()["pid"].toInteger();
         QTRY_VERIFY_WITH_TIMEOUT(supervisor.history().size() == 1, 10000);
         QCOMPARE(supervisor.history().first().toObject()["kind"].toString(), QString("health"));
@@ -1110,6 +1112,7 @@ private slots:
             LoginStartup repaired(moved, LoginStartup::fileBackend(format, folder));
             repaired.refresh();
             QTRY_VERIFY(!repaired.busy());
+            QVERIFY2(repaired.error().isEmpty(), qPrintable(repaired.error()));
             QVERIFY(repaired.enabled());
             QVERIFY(file.open(QIODevice::ReadOnly));
             QVERIFY(file.readAll().contains("Elsewhere"));

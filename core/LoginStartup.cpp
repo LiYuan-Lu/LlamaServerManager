@@ -110,6 +110,9 @@ public:
         LoginStartup::Entry entry;
         bool enabled = true;
         const auto bytes = file.readAll();
+        // Close before done(): refresh() may rewrite the file from inside it, and Windows
+        // cannot replace a file that is still open.
+        file.close();
         if (format == LoginStartup::FileFormat::DesktopEntry) {
             for (const auto& raw : QString::fromUtf8(bytes).split('\n')) {
                 const auto line = raw.trimmed();

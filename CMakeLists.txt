@@ -73,6 +73,10 @@ if(BUILD_TESTING)
   foreach(case restartPolicy healthMonitor systemMonitor gpuMonitor metricsCollector agentMetricsAndSettings logModel autoStartAndShutdown loginStartup guiSingleInstanceAndQuit watchdogStartupGrace watchdogCrashRecovery watchdogHealthRestart watchdogLimitsAndManualStop protocolFraming persistenceAndValidation boundedLogs processLifecycle failuresAndCancellation agentAndGuiReconnect guiDetachedAgent)
     add_test(NAME ${case} COMMAND lsm-tests ${case} -o ${case}-results.txt,txt -o -,txt)
     set_tests_properties(${case} PROPERTIES TIMEOUT 180)
+    if(WIN32)
+      # Outside Qt Creator the Qt DLLs are not on PATH; put them there for ctest.
+      set_tests_properties(${case} PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
+    endif()
   endforeach()
 endif()
 # `cmake --install` produces a self-contained, runnable folder on every platform: the
