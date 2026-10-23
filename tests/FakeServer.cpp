@@ -31,7 +31,7 @@ int main(int argc, char** argv)
         if (qEnvironmentVariableIsSet("FAKE_HELP_HANG")) {
             return app.exec();
         }
-        QTextStream(stdout) << "-m -c -ngl -t --host --port --parallel --metrics\n";
+        QTextStream(stdout) << "-m -c -ngl -t --host --port --parallel --metrics -a, --alias\n";
         return 0;
     }
     bool misbehave = true;

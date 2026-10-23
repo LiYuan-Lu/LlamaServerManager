@@ -228,7 +228,7 @@
         <translation>Agent 已停止，因此沒有模型在執行。按「啟動 Agent」即可再次管理模型。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/Main.qml" line="188"/>
+        <location filename="../apps/gui/qml/Main.qml" line="190"/>
         <source>No models yet. Click + to add your first model.</source>
         <translation>尚未新增任何模型。點選 + 新增第一個模型。</translation>
     </message>
@@ -328,112 +328,112 @@
 <context>
     <name>ModelPage</name>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="41"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="105"/>
         <source>Delete model</source>
         <translation>刪除模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="43"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="107"/>
         <source>Delete &quot;%1&quot;? Its profile and logs will be removed. The model file itself is not touched.</source>
         <translation>要刪除「%1」嗎？其設定檔與日誌會被移除，模型檔案本身不受影響。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="51"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="115"/>
         <source>← All models</source>
         <translation>← 所有模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="53"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="117"/>
         <source>New model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="53"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="117"/>
         <source>New model (copy)</source>
         <translation>新增模型（複本）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="59"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="123"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="61"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="125"/>
         <source>Create a new model with a copy of these settings</source>
         <translation>用這些設定的複本建立新模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="66"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="130"/>
         <source>Delete</source>
         <translation>刪除</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="76"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="140"/>
         <source>PID  %1</source>
         <translation>PID  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="77"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="141"/>
         <source>Port  %1</source>
         <translation>Port  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="78"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="142"/>
         <source>Uptime  %1</source>
         <translation>執行時間  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="79"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="143"/>
         <source>Health  %1</source>
         <translation>健康狀態  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="81"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="145"/>
         <source>Restarts  %1/%2</source>
         <translation>重啟次數  %1/%2</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="82"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="146"/>
         <source>Automatic restarts within the restart window</source>
         <translation>重啟時間窗內的自動重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="94"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="158"/>
         <source>With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.</source>
         <translation>啟用健康檢查時，模型會維持 STARTING，直到 GET /health 回傳 200 才變成 RUNNING。健康檢查失敗、程序當掉或啟動失敗時，會以遞增的等待時間自動重啟；按下停止一定會取消自動重啟。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="116"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
         <source>Console</source>
         <translation>主控台</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="117"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="202"/>
         <source>Restart history (%1)</source>
         <translation>重啟紀錄（%1）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="21"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="45"/>
         <source>Healthy</source>
         <translation>健康</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="22"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="46"/>
         <source>Health checks off</source>
         <translation>未啟用健康檢查</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="23"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="47"/>
         <source>Not running</source>
         <translation>未執行</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="24"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="48"/>
         <source>Loading model (HTTP 503)</source>
         <translation>模型載入中（HTTP 503）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="25"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="49"/>
         <source>Waiting for /health</source>
         <translation>等待 /health 回應</translation>
     </message>
@@ -501,149 +501,174 @@
 <context>
     <name>ProfileEditor</name>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="40"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="45"/>
         <source>Extra arguments must be a JSON array, and environment variables must be a JSON object</source>
         <translation>額外參數必須是 JSON 陣列，環境變數必須是 JSON 物件</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="43"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="48"/>
         <source>Numeric fields must be integers</source>
         <translation>數值欄位必須為整數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="64"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="50"/>
+        <source>Enter an alias or turn the alias option off</source>
+        <translation>請輸入別名，或取消勾選別名選項</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="71"/>
         <source>Select llama-server.exe</source>
         <translation>選擇 llama-server.exe</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="65"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="72"/>
         <source>Select GGUF model</source>
         <translation>選擇 GGUF 模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="70"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="77"/>
         <source>Select working directory</source>
         <translation>選擇工作目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="76"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="90"/>
+        <source>Alias</source>
+        <translation>別名</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="96"/>
+        <source>Pass --alias so /v1/models reports this ID instead of the model file path. Defaults to the name.</source>
+        <translation>啟動時加上 --alias，讓 /v1/models 回報這個 ID，而不是模型檔案路徑。預設與名稱相同。</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="101"/>
+        <source>Model ID reported by /v1/models</source>
+        <translation>/v1/models 回報的模型 ID</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="107"/>
+        <source>The alias is empty. Enter an ID or turn the alias option off.</source>
+        <translation>別名是空的。請輸入 ID，或取消勾選別名選項。</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="111"/>
         <source>Select the executable</source>
         <translation>選擇執行檔</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="77"/>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="80"/>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="83"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="112"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="115"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="118"/>
         <source>Browse…</source>
         <translation>瀏覽…</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="78"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="113"/>
         <source>GGUF model</source>
         <translation>GGUF 模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="79"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="114"/>
         <source>Select the model file</source>
         <translation>選擇模型檔案</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="81"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="116"/>
         <source>Working directory</source>
         <translation>工作目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="82"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="117"/>
         <source>Leave empty to use the executable directory</source>
         <translation>留空使用執行檔目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="103"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="138"/>
         <source>Extra arguments (JSON)</source>
         <translation>額外參數 (JSON)</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="105"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="140"/>
         <source>Environment variables (JSON)</source>
         <translation>環境變數 (JSON)</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="111"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="146"/>
         <source>Start automatically when the Agent starts</source>
         <translation>Agent 啟動時自動啟動此模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="44"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="49"/>
         <source>Enter a name for this model</source>
         <translation>請輸入模型名稱</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="73"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="80"/>
         <source>Name</source>
         <translation>名稱</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="74"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="82"/>
         <source>Shown on the model card</source>
         <translation>顯示在模型卡片上</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="117"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="152"/>
         <source>Watchdog</source>
         <translation>Watchdog</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="114"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="149"/>
         <source>Each time the Agent starts, it starts this model too. Models stopped with Stop stay stopped until the next Agent start.</source>
         <translation>每次 Agent 啟動時，也會一併啟動此模型。用「停止」停下的模型會維持停止，直到下次 Agent 啟動。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="122"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="157"/>
         <source>Restart automatically after crashes, startup failures, and failed health checks</source>
         <translation>程序當掉、啟動失敗或健康檢查失敗時自動重新啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="125"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="160"/>
         <source>Check GET /health (STARTING lasts until it returns 200)</source>
         <translation>檢查 GET /health（回傳 200 前維持 STARTING）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="129"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="164"/>
         <source>Interval (s)</source>
         <translation>間隔（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="131"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="166"/>
         <source>Timeout (s)</source>
         <translation>逾時（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="133"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="168"/>
         <source>Failures before unhealthy</source>
         <translation>判定異常的連續失敗次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="135"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="170"/>
         <source>Startup grace (s)</source>
         <translation>載入寬限期（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="137"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="172"/>
         <source>Restart cooldown (s)</source>
         <translation>重啟冷卻（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="139"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="174"/>
         <source>Max backoff (s)</source>
         <translation>最長等待（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="141"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="176"/>
         <source>Max restarts</source>
         <translation>最多重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="143"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="178"/>
         <source>Within (s)</source>
         <translation>時間窗（秒）</translation>
     </message>
@@ -840,22 +865,25 @@
 <context>
     <name>ServerControls</name>
     <message>
-        <location filename="../apps/gui/qml/ServerControls.qml" line="20"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="26"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="56"/>
         <source>▶ Start</source>
         <translation>▶ 啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ServerControls.qml" line="21"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="27"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="58"/>
         <source>Stopping…</source>
         <translation>停止中…</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ServerControls.qml" line="21"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="27"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="57"/>
         <source>■ Stop</source>
         <translation>■ 停止</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ServerControls.qml" line="30"/>
+        <location filename="../apps/gui/qml/ServerControls.qml" line="62"/>
         <source>⟳ Restart</source>
         <translation>⟳ 重新啟動</translation>
     </message>
@@ -869,88 +897,88 @@
     </message>
     <message>
         <location filename="../apps/gui/TrayIcon.cpp" line="116"/>
-        <location filename="../apps/gui/TrayIcon.cpp" line="152"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="154"/>
         <source>Agent stopped</source>
         <translation>Agent 已停止</translation>
     </message>
     <message>
         <location filename="../apps/gui/TrayIcon.cpp" line="116"/>
-        <location filename="../apps/gui/TrayIcon.cpp" line="152"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="154"/>
         <source>Connecting to the Agent…</source>
         <translation>正在連線到 Agent…</translation>
     </message>
     <message>
         <location filename="../apps/gui/TrayIcon.cpp" line="119"/>
-        <location filename="../apps/gui/TrayIcon.cpp" line="153"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="155"/>
         <source>%1 of %2 models running</source>
         <translation>%1 / %2 個模型執行中</translation>
     </message>
     <message numerus="yes">
-        <location filename="../apps/gui/TrayIcon.cpp" line="122"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="124"/>
         <source>%n model(s) failed</source>
         <translation>
             <numerusform>%n 個模型失敗</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="140"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="142"/>
         <source>Hide window</source>
         <translation>隱藏視窗</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="142"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="144"/>
         <source>Show window</source>
         <translation>顯示視窗</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="163"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="165"/>
         <source>Start</source>
         <translation>啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="163"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="165"/>
         <source>Stop</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="166"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="168"/>
         <source>Restart</source>
         <translation>重新啟動</translation>
     </message>
     <message numerus="yes">
-        <location filename="../apps/gui/TrayIcon.cpp" line="171"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="173"/>
         <source>%n more in the window…</source>
         <translation>
             <numerusform>還有 %n 個，請在視窗中查看…</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="176"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="178"/>
         <source>Open logs folder</source>
         <translation>開啟日誌資料夾</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="178"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="180"/>
         <source>Start at sign-in</source>
         <translation>登入時啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="185"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="187"/>
         <source>Stop Agent…</source>
         <translation>停止 Agent…</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="191"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="193"/>
         <source>Start Agent</source>
         <translation>啟動 Agent</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="194"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="196"/>
         <source>Exit (models keep running)</source>
         <translation>結束（模型繼續執行）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/TrayIcon.cpp" line="210"/>
+        <location filename="../apps/gui/TrayIcon.cpp" line="212"/>
         <source>Still running here. The Agent and your models keep running; use this icon to open the window or exit.</source>
         <translation>程式仍在這裡執行。Agent 與模型會繼續運作；可用這個圖示開啟視窗或結束。</translation>
     </message>

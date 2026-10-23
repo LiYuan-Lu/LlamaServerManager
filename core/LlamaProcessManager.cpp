@@ -66,6 +66,9 @@ LlamaProcessManager::LlamaProcessManager(QObject* parent)
         if (current.metrics) {
             required << "--metrics";
         }
+        if (current.aliasEnabled) {
+            required << "--alias";
+        }
         for (const auto& flag : required) {
             QRegularExpression re("(?<![\\w-])" + QRegularExpression::escape(flag) + "(?![\\w-])");
             if (!output.contains(re)) {

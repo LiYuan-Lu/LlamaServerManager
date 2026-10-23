@@ -26,6 +26,9 @@ struct Profile {
     int port = 8080, context = 4096, gpuLayers = 0, threads = 4, parallel = 1;
     bool metrics = false;
     bool autoStart = false; // start this model when the Agent starts
+    // When enabled, passed as --alias so /v1/models reports a stable ID instead of the model path.
+    bool aliasEnabled = false;
+    QString alias;
     QStringList extraArguments;
     QJsonObject environment;
     WatchdogSettings watchdog;

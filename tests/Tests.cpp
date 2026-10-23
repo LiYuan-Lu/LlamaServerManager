@@ -591,6 +591,35 @@ private slots:
         QVERIFY(Profile::fromJson(o, p, error));
         QVERIFY(p.watchdog.autoRestart); // older files get defaults
     }
+    void aliasOption()
+    {
+        // Optional, off by default: older profiles keep the model path as their ID.
+        Profile p;
+        QString error;
+        QVERIFY(Profile::fromJson({ }, p, error));
+        QVERIFY(!p.aliasEnabled);
+        QVERIFY(!p.arguments().contains("--alias"));
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", "yes" } }, p, error));
+        QVERIFY(!Profile::fromJson({ { "alias", 5 } }, p, error));
+        // Enabled aliases must be a single, non-empty ID.
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", true } }, p, error));
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", true }, { "alias", "   " } }, p, error));
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", true }, { "alias", "a,b" } }, p, error));
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", true }, { "alias", " qwen" } }, p, error));
+        QVERIFY(!Profile::fromJson({ { "aliasEnabled", true }, { "alias", QString(129, 'a') } }, p, error));
+        // A disabled alias may be empty.
+        QVERIFY(Profile::fromJson({ { "aliasEnabled", false }, { "alias", "" } }, p, error));
+        QVERIFY(Profile::fromJson({ { "aliasEnabled", true }, { "alias", "Qwen3 8B" } }, p, error));
+        const auto args = p.arguments();
+        QCOMPARE(args.value(args.indexOf("--alias") + 1), QString("Qwen3 8B"));
+        QCOMPARE(p.toJson()["alias"].toString(), QString("Qwen3 8B"));
+        QVERIFY(p.toJson()["aliasEnabled"].toBool());
+        // The alias is a managed option, so extra arguments cannot set it.
+        p.extraArguments = { "-a", "other" };
+        QVERIFY(!p.validate(false).isEmpty());
+        p.extraArguments = { "--alias=other" };
+        QVERIFY(!p.validate(false).isEmpty());
+    }
     void boundedLogs()
     {
         QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");

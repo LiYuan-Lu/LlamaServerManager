@@ -14,11 +14,16 @@ ColumnLayout {
     // Set while a create/update request is in flight so the page can follow a new model's ID.
     property bool savePending: false
     property string validationError: ""
+    // Name before the latest edit; the alias follows the name while the two match.
+    property string previousName: ""
+    readonly property bool aliasMissing: aliasBox.checked && alias.text.trim().length === 0
     spacing: 8
     function load() {
         const entry = agent.instances[profileId]
         const p = entry ? (entry.profile || {}) : (template || {})
         name.text = p.name || ""
+        alias.text = p.alias || ""; aliasBox.checked = p.aliasEnabled === true
+        previousName = name.text
         exe.text = p.executable || ""; model.text = p.model || ""; cwd.text = p.workingDirectory || ""
         host.text = p.host || "127.0.0.1"; port.text = String(entry ? (p.port || suggestedPort) : suggestedPort)
         context.text = String(p.context || 4096); gpu.text = String(p.gpuLayers === undefined ? 0 : p.gpuLayers)
@@ -42,9 +47,11 @@ ColumnLayout {
             const wd = [wdInterval.text, wdTimeout.text, wdThreshold.text, wdGrace.text, wdCooldown.text, wdBackoff.text, wdMax.text, wdWindow.text].map(Number)
             if (values.concat(wd).some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
             if (name.text.trim().length === 0) throw new Error(qsTr("Enter a name for this model"))
+            if (aliasMissing) throw new Error(qsTr("Enter an alias or turn the alias option off"))
             validationError = ""
             const profile = {name: name.text.trim(), executable: exe.text, model: model.text, workingDirectory: cwd.text,
                 host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],
+                aliasEnabled: aliasBox.checked, alias: alias.text.trim(),
                 metrics: metrics.checked, autoStart: autoStartBox.checked, extraArguments: args, environment: variables,
                 watchdog: {autoRestart: autoRestart.checked, healthCheck: healthCheck.checked,
                     intervalSeconds: wd[0], timeoutSeconds: wd[1], failureThreshold: wd[2], startupGraceSeconds: wd[3],
@@ -71,7 +78,35 @@ ColumnLayout {
     GridLayout {
         columns: 3; Layout.fillWidth: true; enabled: editor.editable
         Label { text: qsTr("Name") }
-        TextField { id: name; Layout.fillWidth: true; Layout.columnSpan: 2; maximumLength: 128; placeholderText: qsTr("Shown on the model card"); onTextEdited: editor.dirty = true }
+        TextField {
+            id: name; Layout.fillWidth: true; Layout.columnSpan: 2; maximumLength: 128; placeholderText: qsTr("Shown on the model card")
+            onTextEdited: editor.dirty = true
+            onTextChanged: {
+                if (alias.text === editor.previousName.trim()) alias.text = text.trim()
+                editor.previousName = text
+            }
+        }
+        CheckBox {
+            id: aliasBox; text: qsTr("Alias")
+            onClicked: {
+                if (checked && alias.text.trim().length === 0) alias.text = name.text.trim()
+                editor.dirty = true
+            }
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Pass --alias so /v1/models reports this ID instead of the model file path. Defaults to the name.")
+        }
+        TextField {
+            id: alias; Layout.fillWidth: true; Layout.columnSpan: 2; maximumLength: 128
+            enabled: aliasBox.checked
+            placeholderText: qsTr("Model ID reported by /v1/models")
+            onTextEdited: editor.dirty = true
+        }
+        Label {
+            visible: editor.aliasMissing
+            Layout.columnSpan: 3
+            text: qsTr("The alias is empty. Enter an ID or turn the alias option off.")
+            color: "#fbbf24"; wrapMode: Text.Wrap; Layout.fillWidth: true
+        }
         Label { text: "llama-server.exe" }
         TextField { id: exe; Layout.fillWidth: true; placeholderText: qsTr("Select the executable"); onTextEdited: editor.dirty = true }
         Button { text: qsTr("Browse…"); onClicked: exeDialog.open() }

@@ -12,6 +12,7 @@ QJsonObject Profile::toJson() const
     return { { "id", id }, { "name", name }, { "executable", executable }, { "model", model }, { "workingDirectory", workingDirectory },
         { "host", host }, { "port", port }, { "context", context }, { "gpuLayers", gpuLayers },
         { "threads", threads }, { "parallel", parallel }, { "metrics", metrics }, { "autoStart", autoStart },
+        { "aliasEnabled", aliasEnabled }, { "alias", alias },
         { "extraArguments", QJsonArray::fromStringList(extraArguments) }, { "environment", environment },
         { "watchdog", watchdog.toJson() } };
 }
@@ -44,6 +45,7 @@ bool Profile::fromJson(const QJsonObject& o, Profile& p, QString& error)
     if (!str("id", candidate.id) || !str("name", candidate.name)
         || !str("executable", candidate.executable) || !str("model", candidate.model)
         || !str("workingDirectory", candidate.workingDirectory) || !str("host", candidate.host)
+        || !str("alias", candidate.alias)
         || !number("port", candidate.port) || !number("context", candidate.context)
         || !number("gpuLayers", candidate.gpuLayers) || !number("threads", candidate.threads)
         || !number("parallel", candidate.parallel)) {
@@ -59,6 +61,11 @@ bool Profile::fromJson(const QJsonObject& o, Profile& p, QString& error)
         return false;
     }
     candidate.autoStart = o["autoStart"].toBool();
+    if (o.contains("aliasEnabled") && !o["aliasEnabled"].isBool()) {
+        error = "aliasEnabled must be boolean";
+        return false;
+    }
+    candidate.aliasEnabled = o["aliasEnabled"].toBool();
     if (o.contains("extraArguments") && !o["extraArguments"].isArray()) {
         error = "extraArguments must be an array";
         return false;
@@ -105,6 +112,19 @@ QString Profile::validate(bool files) const
     if (name.size() > 128 || name.contains(QChar::Null)) {
         return "Name must be at most 128 characters";
     }
+    if (alias.size() > 128 || alias.contains(QChar::Null)) {
+        return "Alias must be at most 128 characters";
+    }
+    if (aliasEnabled) {
+        if (alias.trimmed().isEmpty()) {
+            return "Enter an alias or turn the alias option off";
+        }
+        // llama-server splits --alias on commas; keep a single, exact ID.
+        static const QRegularExpression invalidAlias("[,\\p{Cc}]");
+        if (alias != alias.trimmed() || alias.contains(invalidAlias)) {
+            return "Alias must not contain commas, control characters, or leading/trailing spaces";
+        }
+    }
     if (QHostAddress(host).isNull()) {
         return "Host must be a numeric IPv4 or IPv6 address";
     }
@@ -122,7 +142,7 @@ QString Profile::validate(bool files) const
             return "Working directory does not exist";
         }
     }
-    const QSet<QString> reserved = { "-m", "--model", "--model-url", "-mu", "--hf-repo", "-hf", "--host", "--port", "-c", "--ctx-size", "-ngl", "--gpu-layers", "--n-gpu-layers", "-t", "--threads", "--parallel", "-np", "--metrics", "--help", "-h", "--version" };
+    const QSet<QString> reserved = { "-m", "--model", "--model-url", "-mu", "--hf-repo", "-hf", "--host", "--port", "-c", "--ctx-size", "-ngl", "--gpu-layers", "--n-gpu-layers", "-t", "--threads", "--parallel", "-np", "--metrics", "-a", "--alias", "--help", "-h", "--version" };
     for (const auto& arg : extraArguments) {
         if (arg.contains(QChar::Null) || reserved.contains(arg.section('=', 0, 0))) {
             return "Extra arguments must not override managed options or request help/version";
@@ -141,6 +161,9 @@ QStringList Profile::arguments() const
         "-t", QString::number(threads), "--host", host, "--port", QString::number(port), "--parallel", QString::number(parallel) };
     if (metrics) {
         a << "--metrics";
+    }
+    if (aliasEnabled) {
+        a << "--alias" << alias;
     }
     return a + extraArguments;
 }
