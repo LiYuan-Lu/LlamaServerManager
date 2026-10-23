@@ -7,7 +7,7 @@ ApplicationWindow {
     visible: true
     width: 1120; height: 850
     minimumWidth: 840; minimumHeight: 650
-    title: qsTr("Llama Server Manager · Phase 1")
+    title: qsTr("Llama Server Manager")
     palette.window: "#111827"
     palette.base: "#1f2937"
     palette.alternateBase: "#263449"
@@ -16,8 +16,21 @@ ApplicationWindow {
     palette.button: "#334155"
     palette.buttonText: "#f8fafc"
     palette.highlight: "#2563eb"
-    readonly property string serverState: agent.status.state || "UNKNOWN"
-    readonly property bool idle: serverState === "STOPPED" || serverState === "FAILED"
+
+    readonly property int runningCount: {
+        let n = 0
+        for (const id of agent.instanceIds) if ((agent.instances[id] || {}).state === "RUNNING") ++n
+        return n
+    }
+    function nextPort() {
+        let port = 8079
+        for (const id of agent.instanceIds) port = Math.max(port, ((agent.instances[id] || {}).profile || {}).port || 0)
+        return Math.min(port + 1, 65535)
+    }
+    function openModel(id) {
+        stack.push(modelPage, {profileId: id, suggestedPort: nextPort()})
+    }
+
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 20; spacing: 12
         RowLayout {
@@ -38,45 +51,49 @@ ApplicationWindow {
                 onClicked: languageManager.setLanguage(languageManager.language === "zh_TW" ? "en" : "zh_TW")
             }
         }
-        Label { text: qsTr("Single model management · The Agent and model keep running after the window is closed"); color: "#94a3b8" }
-        Frame {
-            Layout.fillWidth: true
-            RowLayout {
-                anchors.fill: parent
-                Label { text: root.serverState; font.bold: true; font.pixelSize: 20; Layout.fillWidth: true }
-                Label { text: qsTr("PID  %1").arg(agent.status.pid || "—") }
-                Label { text: qsTr("Port  %1").arg(agent.status.port || "—") }
-                Label { text: qsTr("Uptime  %1 s").arg(agent.status.uptimeSeconds || 0) }
-                Button {
-                    text: qsTr("Start")
-                    enabled: agent.connected && root.idle && !agent.busy && !editor.dirty
-                    onClicked: agent.request("startServer")
-                }
-                Button {
-                    text: qsTr("Stop")
-                    enabled: agent.connected && !root.idle && root.serverState !== "STOPPING"
-                    onClicked: agent.request("stopServer")
-                }
-                Button {
-                    text: qsTr("Restart")
-                    enabled: agent.connected && root.serverState === "RUNNING" && !agent.busy
-                    onClicked: agent.request("restartServer")
-                }
-            }
-        }
         Label {
-            text: qsTr("RUNNING means the process has started; check the logs for model loading progress. Phase 1 does not perform HTTP health checks.")
-            color: "#94a3b8"; wrapMode: Text.Wrap; Layout.fillWidth: true
+            text: qsTr("%1 of %2 models running · The Agent and models keep running after the window is closed")
+                .arg(root.runningCount).arg(agent.instanceIds.length)
+            color: "#94a3b8"
         }
-        Label { text: agent.error || agent.status.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
-        SplitView {
-            orientation: Qt.Vertical; Layout.fillWidth: true; Layout.fillHeight: true
-            ScrollView {
-                SplitView.preferredHeight: 360; SplitView.minimumHeight: 120
-                contentWidth: availableWidth
-                ProfileEditor { id: editor; width: parent.width; editable: agent.connected && root.idle && !agent.busy }
+        Label { text: agent.error || ""; visible: text.length > 0; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        Label { text: agent.warning || ""; visible: text.length > 0; color: "#fbbf24"; wrapMode: Text.Wrap; Layout.fillWidth: true }
+        StackView {
+            id: stack
+            Layout.fillWidth: true; Layout.fillHeight: true
+            clip: true
+            initialItem: gridPage
+        }
+    }
+
+    Component {
+        id: gridPage
+        ScrollView {
+            id: scroll
+            contentWidth: availableWidth
+            contentHeight: flow.height
+            Flow {
+                id: flow
+                width: scroll.availableWidth
+                spacing: 14
+                readonly property int columns: Math.max(1, Math.floor((width + spacing) / (300 + spacing)))
+                readonly property real cardWidth: Math.max(240, Math.floor((width - spacing * (columns - 1)) / columns))
+                Repeater {
+                    model: agent.instanceIds
+                    ModelCard { width: flow.cardWidth; profileId: modelData; onOpen: root.openModel(modelData) }
+                }
+                AddCard { width: flow.cardWidth; onClicked: root.openModel("") }
+                Label {
+                    visible: agent.synchronized && agent.instanceIds.length === 0
+                    width: flow.width
+                    text: qsTr("No models yet. Click + to add your first model.")
+                    color: "#94a3b8"
+                }
             }
-            LogView { SplitView.fillHeight: true; SplitView.minimumHeight: 150 }
         }
+    }
+    Component {
+        id: modelPage
+        ModelPage { onBack: { agent.selectedId = ""; agent.clearError(); stack.pop() } }
     }
 }

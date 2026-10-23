@@ -1,14 +1,18 @@
 #include "AgentServer.h"
 #include "Protocol.h"
+#include <QDir>
+#include <QHostAddress>
 #include <QLocalSocket>
 AgentServer::AgentServer(const QString &dir, QObject *parent)
-    : QObject(parent), directory(dir), store(dir), logs(dir + "/logs") {
-    QString warning; profile = store.load(warning);
-    connect(&manager, &LlamaProcessManager::log, &logs, &LogStore::append);
-    connect(&manager, &LlamaProcessManager::changed, this, [this] { broadcast("status", snapshot()); });
-    connect(&logs, &LogStore::entry, this, [this](const QJsonObject &entry) { broadcast("log", entry); });
-    connect(&logs, &LogStore::storageError, this, [this](const QString &error) { broadcast("warning", {{"message", error}}); });
-    if (!warning.isEmpty()) logs.append("agent", warning + "\n");
+    : QObject(parent), directory(dir), store(dir) {
+    bool changed = false;
+    const auto loaded = store.load(loadWarning, &changed);
+    for (const auto &p : loaded) add(p);
+    if (changed) {
+        // Stable IDs are required for per-model log directories; save migrated/assigned IDs once.
+        QString error;
+        if (!persist(loaded, error)) loadWarning = "Cannot save migrated profiles: " + error;
+    }
     connect(&server, &QLocalServer::newConnection, this, [this] {
         while (auto *socket = server.nextPendingConnection()) {
             if (clients.size() >= 16) { socket->abort(); socket->deleteLater(); continue; }
@@ -34,8 +38,62 @@ AgentServer::~AgentServer() {
         disconnect(socket, nullptr, this, nullptr);
         socket->abort();
     }
+    for (auto *instance : instances) { delete instance->manager; delete instance->logs; delete instance; }
+    instances.clear();
 }
-QJsonObject AgentServer::snapshot() const { auto s = manager.status(); s["profile"] = profile.toJson(); return s; }
+AgentServer::Instance *AgentServer::find(const QString &id) const {
+    for (auto *instance : instances) if (instance->profile.id == id) return instance;
+    return nullptr;
+}
+AgentServer::Instance *AgentServer::add(const Profile &profile) {
+    auto *instance = new Instance{profile, new LlamaProcessManager(this), new LogStore(directory + "/logs/" + profile.id, this)};
+    const QString id = profile.id;
+    connect(instance->manager, &LlamaProcessManager::log, instance->logs, &LogStore::append);
+    connect(instance->manager, &LlamaProcessManager::changed, this, [this] { broadcast("status", snapshot()); });
+    connect(instance->logs, &LogStore::entry, this, [this, id](const QJsonObject &entry) {
+        auto record = entry; record["profileId"] = id; broadcast("log", record);
+    });
+    connect(instance->logs, &LogStore::storageError, this, [this, id](const QString &error) {
+        broadcast("warning", {{"profileId", id}, {"message", error}});
+    });
+    instances.append(instance);
+    return instance;
+}
+void AgentServer::remove(Instance *instance) {
+    instances.removeOne(instance);
+    disconnect(instance->manager, nullptr, this, nullptr);
+    disconnect(instance->logs, nullptr, this, nullptr);
+    delete instance->manager; delete instance->logs;
+    QDir(directory + "/logs/" + instance->profile.id).removeRecursively();
+    delete instance;
+}
+QList<Profile> AgentServer::profiles() const {
+    QList<Profile> list;
+    for (const auto *instance : instances) list << instance->profile;
+    return list;
+}
+bool AgentServer::persist(const QList<Profile> &list, QString &error) { return store.save(list, error); }
+QString AgentServer::portConflict(const Instance *self) const {
+    const QHostAddress host(self->profile.host);
+    for (const auto *other : instances) {
+        if (other == self || !other->manager->active() || other->profile.port != self->profile.port) continue;
+        const QHostAddress otherHost(other->profile.host);
+        const bool wildcard = host == QHostAddress::AnyIPv4 || host == QHostAddress::AnyIPv6
+            || otherHost == QHostAddress::AnyIPv4 || otherHost == QHostAddress::AnyIPv6;
+        if (wildcard || host.isEqual(otherHost))
+            return QString("Port %1 is already used by model \"%2\"").arg(self->profile.port).arg(other->profile.displayName());
+    }
+    return {};
+}
+QJsonObject AgentServer::snapshot() const {
+    QJsonArray list;
+    for (const auto *instance : instances) {
+        auto s = instance->manager->status();
+        s["id"] = instance->profile.id; s["name"] = instance->profile.displayName(); s["profile"] = instance->profile.toJson();
+        list.append(s);
+    }
+    return {{"instances", list}, {"warning", loadWarning}};
+}
 void AgentServer::broadcast(const QString &event, const QJsonObject &data) {
     const auto sockets = clients.keys();
     for (auto *socket : sockets) Protocol::send(socket, {{"version", 1}, {"event", event}, {"data", data}});
@@ -53,21 +111,50 @@ void AgentServer::receive(QLocalSocket *socket) {
     if (clients.contains(socket)) clients[socket] = buffer;
 }
 void AgentServer::command(QLocalSocket *socket, const QJsonObject &m) {
-    const QString id = m["id"].toString(), cmd = m["command"].toString();
+    const QString id = m["id"].toString(), cmd = m["command"].toString(), profileId = m["profileId"].toString();
     QString error; QJsonObject data;
     if (id.isEmpty() || id.size() > 128) { socket->abort(); return; }
-    if (cmd == "getStatus") data = snapshot();
-    else if (cmd == "getLogs") data = {{"entries", logs.snapshot()}};
-    else if (cmd == "updateProfile") {
+    const bool needsInstance = cmd == "getLogs" || cmd == "updateProfile" || cmd == "deleteProfile"
+        || cmd == "startServer" || cmd == "stopServer" || cmd == "restartServer";
+    Instance *instance = needsInstance ? find(profileId) : nullptr;
+    if (needsInstance && !instance) error = profileId.isEmpty() ? "Missing profileId" : "Unknown profile: " + profileId;
+    else if (cmd == "getStatus") data = snapshot();
+    else if (cmd == "listProfiles") {
+        QJsonArray list; for (const auto &p : profiles()) list.append(p.toJson());
+        data = {{"profiles", list}};
+    } else if (cmd == "getLogs") data = {{"profileId", profileId}, {"entries", instance->logs->snapshot()}};
+    else if (cmd == "createProfile") {
         Profile candidate;
-        if (manager.active()) error = "Stop the server before changing its profile";
-        else if (!m["profile"].isObject()) error = "Missing profile object";
-        else if (Profile::fromJson(m["profile"].toObject(), candidate, error) && store.save(candidate, error)) {
-            profile = candidate; data = snapshot(); broadcast("status", data);
+        if (!m["profile"].isObject()) error = "Missing profile object";
+        else if (Profile::fromJson(m["profile"].toObject(), candidate, error)) {
+            candidate.id = Profile::newId();
+            if (candidate.name.trimmed().isEmpty()) candidate.name = candidate.displayName();
+            auto list = profiles(); list << candidate;
+            if (persist(list, error)) {
+                add(candidate); data = snapshot(); broadcast("status", data); data["id"] = candidate.id;
+            }
         }
-    } else if (cmd == "startServer") error = manager.start(profile);
-    else if (cmd == "stopServer") error = manager.stop();
-    else if (cmd == "restartServer") error = manager.restart(profile);
-    else error = "Unknown or unavailable Phase 1 command: " + cmd;
+    } else if (cmd == "updateProfile") {
+        Profile candidate;
+        if (instance->manager->active()) error = "Stop the server before changing its profile";
+        else if (!m["profile"].isObject()) error = "Missing profile object";
+        else if (Profile::fromJson(m["profile"].toObject(), candidate, error)) {
+            candidate.id = profileId;
+            if (candidate.name.trimmed().isEmpty()) candidate.name = candidate.displayName();
+            auto list = profiles(); list[instances.indexOf(instance)] = candidate;
+            if (persist(list, error)) { instance->profile = candidate; data = snapshot(); broadcast("status", data); }
+        }
+    } else if (cmd == "deleteProfile") {
+        if (instance->manager->active()) error = "Stop the server before deleting this model";
+        else {
+            auto list = profiles(); list.removeAt(instances.indexOf(instance));
+            if (persist(list, error)) { remove(instance); data = snapshot(); broadcast("status", data); }
+        }
+    } else if (cmd == "startServer" || cmd == "restartServer") {
+        error = instance->manager->active() && cmd == "restartServer" ? QString() : portConflict(instance);
+        if (error.isEmpty())
+            error = cmd == "startServer" ? instance->manager->start(instance->profile) : instance->manager->restart(instance->profile);
+    } else if (cmd == "stopServer") error = instance->manager->stop();
+    else error = "Unknown or unavailable command: " + cmd;
     Protocol::send(socket, {{"version", 1}, {"id", id}, {"ok", error.isEmpty()}, {"error", error}, {"data", data}});
 }

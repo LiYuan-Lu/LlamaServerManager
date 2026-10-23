@@ -18,7 +18,18 @@
 
 class Tests : public QObject {
     Q_OBJECT
-    QString binary(const QString &name) { return QCoreApplication::applicationDirPath() + "/" + name + ".exe"; }
+    QString binary(const QString &name) {
+#ifdef Q_OS_WIN
+        return QCoreApplication::applicationDirPath() + "/" + name + ".exe";
+#else
+        return QCoreApplication::applicationDirPath() + "/" + name;
+#endif
+    }
+    QJsonObject instance(QLocalSocket &socket, const QString &profileId) {
+        for (const auto &v : rpc(socket, "getStatus")["data"].toObject()["instances"].toArray())
+            if (v.toObject()["id"].toString() == profileId) return v.toObject();
+        return {};
+    }
     int freePort() { QTcpServer s; if (!s.listen(QHostAddress::LocalHost, 0)) return 0; return s.serverPort(); }
     Profile profile(const QString &dir) {
         Profile p; p.executable = binary("fake-llama-server"); p.model = dir + "/測試 model.gguf";
@@ -54,7 +65,8 @@ private slots:
         const auto errors = gui.readAllStandardError();
         QVERIFY2(gui.exitCode() == 0, errors.constData());
         QLocalSocket socket; socket.connectToServer(Protocol::endpoint(dir.path())); QVERIFY(socket.waitForConnected(3000));
-        QCOMPARE(rpc(socket, "getStatus")["data"].toObject()["state"].toString(), "STOPPED");
+        const auto data = rpc(socket, "getStatus")["data"].toObject();
+        QVERIFY(data["instances"].isArray()); QCOMPARE(data["instances"].toArray().size(), 0);
 #else
         QSKIP("Windows detached Agent test");
 #endif
@@ -69,11 +81,28 @@ private slots:
     }
     void persistenceAndValidation() {
         QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX"); QVERIFY(dir.isValid()); ProfileStore store(dir.path()); auto p = profile(dir.path()); QString error;
-        QVERIFY(store.save(p, error)); p.context = 2048; QVERIFY(store.save(p, error));
-        QCOMPARE(store.load(error).context, 2048);
+        p.id = "first"; p.name = "First";
+        auto second = p; second.id = "second"; second.name = "Second"; second.port = p.port + 1;
+        QVERIFY(store.save({p, second}, error)); p.context = 2048; QVERIFY(store.save({p, second}, error));
+        bool changed = true; auto loaded = store.load(error, &changed);
+        QCOMPARE(loaded.size(), 2); QVERIFY(!changed);
+        QCOMPARE(loaded[0].id, QString("first")); QCOMPARE(loaded[0].context, 2048); QCOMPARE(loaded[1].name, QString("Second"));
+        auto duplicate = second; duplicate.id = "first"; QVERIFY(!store.save({p, duplicate}, error));
         QFile corrupt(dir.path() + "/profiles.json"); QVERIFY(corrupt.open(QIODevice::WriteOnly)); corrupt.write("broken"); corrupt.close();
-        QCOMPARE(store.load(error).context, 4096); QVERIFY(!error.isEmpty());
+        error.clear(); loaded = store.load(error);
+        QCOMPARE(loaded.size(), 2); QCOMPARE(loaded[0].context, 4096); QVERIFY(!error.isEmpty());
+        // Phase 1 single-profile files migrate to one model with a generated ID.
+        QTemporaryDir legacyDir(QDir::currentPath() + "/lsm-test-XXXXXX"); QVERIFY(legacyDir.isValid());
+        Profile legacy = profile(legacyDir.path()); legacy.context = 1024;
+        auto legacyJson = legacy.toJson(); legacyJson.remove("id"); legacyJson.remove("name");
+        QFile v1(legacyDir.path() + "/profiles.json"); QVERIFY(v1.open(QIODevice::WriteOnly));
+        v1.write(QJsonDocument(QJsonObject{{"version", 1}, {"profile", legacyJson}}).toJson()); v1.close();
+        ProfileStore legacyStore(legacyDir.path()); error.clear(); changed = false;
+        loaded = legacyStore.load(error, &changed);
+        QVERIFY(error.isEmpty()); QVERIFY(changed); QCOMPARE(loaded.size(), 1);
+        QVERIFY(Profile::validId(loaded[0].id)); QCOMPARE(loaded[0].context, 1024); QCOMPARE(loaded[0].name, QString("測試 model"));
         p.extraArguments = {"--port=1234"}; QVERIFY(!p.validate().isEmpty());
+        p.extraArguments = {}; p.id = "../escape"; QVERIFY(!p.validate(false).isEmpty());
         auto o = p.toJson(); o["port"] = 1.5; QVERIFY(!Profile::fromJson(o, p, error));
     }
     void boundedLogs() {
@@ -133,10 +162,13 @@ private slots:
             p.model = qEnvironmentVariable("LSM_TEST_REAL_MODEL");
             p.context = 512; p.threads = 2; p.gpuLayers = 0;
         }
-        QVERIFY(rpc(socket, "updateProfile", {{"profile", p.toJson()}})["ok"].toBool());
-        QVERIFY(rpc(socket, "startServer")["ok"].toBool());
+        const auto created = rpc(socket, "createProfile", {{"profile", p.toJson()}});
+        QVERIFY2(created["ok"].toBool(), qPrintable(created["error"].toString()));
+        const auto id = created["data"].toObject()["id"].toString(); QVERIFY(!id.isEmpty());
+        QVERIFY(!rpc(socket, "startServer")["ok"].toBool()); // profileId is required
+        QVERIFY(rpc(socket, "startServer", {{"profileId", id}})["ok"].toBool());
         QJsonObject status;
-        QTRY_VERIFY_WITH_TIMEOUT(([&] { status = rpc(socket, "getStatus")["data"].toObject(); return status["state"] == "RUNNING"; })(), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(([&] { status = instance(socket, id); return status["state"] == "RUNNING"; })(), 10000);
         const auto pid = status["pid"].toInteger(); QVERIFY(pid > 0);
         if (realModel) {
             // Acceptance-only check, deliberately not a product HealthMonitor.
@@ -154,6 +186,25 @@ private slots:
             QVERIFY2(healthy, "Real model failed to reach HTTP 200 within 90 seconds");
         }
         QVERIFY(!rpc(socket, "nonsense")["ok"].toBool());
+        QVERIFY(!rpc(socket, "deleteProfile", {{"profileId", id}})["ok"].toBool()); // active models cannot be deleted
+        // A second model on another port runs alongside the first; a third on the same port is refused.
+        auto p2 = profile(dir.path()); p2.name = "Second";
+        const auto id2 = rpc(socket, "createProfile", {{"profile", p2.toJson()}})["data"].toObject()["id"].toString();
+        QVERIFY(!id2.isEmpty());
+        auto clash = p2; clash.port = p.port; clash.name = "Clash";
+        const auto clashId = rpc(socket, "createProfile", {{"profile", clash.toJson()}})["data"].toObject()["id"].toString();
+        const auto refused = rpc(socket, "startServer", {{"profileId", clashId}});
+        QVERIFY(!refused["ok"].toBool()); QVERIFY(refused["error"].toString().contains(QString::number(p.port)));
+        QVERIFY(rpc(socket, "deleteProfile", {{"profileId", clashId}})["ok"].toBool());
+        QVERIFY(rpc(socket, "startServer", {{"profileId", id2}})["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id2)["state"].toString(), "RUNNING", 10000);
+        const auto pid2 = instance(socket, id2)["pid"].toInteger(); QVERIFY(pid2 > 0 && pid2 != pid);
+        const auto logs2 = rpc(socket, "getLogs", {{"profileId", id2}})["data"].toObject()["entries"].toArray();
+        QVERIFY(!logs2.isEmpty());
+        QVERIFY(rpc(socket, "stopServer", {{"profileId", id2}})["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id2)["state"].toString(), "STOPPED", 6000);
+        QCOMPARE(instance(socket, id)["state"].toString(), "RUNNING"); // stopping one must not touch another
+        QCOMPARE(instance(socket, id)["pid"].toInteger(), pid);
         // A real QML GUI connects to the running Agent, exits normally, then reopens.
         for (int i = 0; i < 2; ++i) {
             QProcess gui;
@@ -167,17 +218,19 @@ private slots:
             const auto errors = gui.readAllStandardError();
             QVERIFY2(gui.exitCode() == 0, qPrintable(QString("GUI exit=%1, stderr=%2").arg(gui.exitCode()).arg(QString::fromUtf8(errors))));
             QVERIFY2(!errors.contains("ReferenceError") && !errors.contains("TypeError") && !errors.contains("failed to load"), errors.constData());
-            QCOMPARE(rpc(socket, "getStatus")["data"].toObject()["pid"].toInteger(), pid);
+            QCOMPARE(instance(socket, id)["pid"].toInteger(), pid);
         }
         socket.abort(); QTest::qWait(300);
         socket.connectToServer(Protocol::endpoint(dir.path())); QVERIFY(socket.waitForConnected(5000));
         QTest::qWait(2500); // Cross the 10-second startup deadline: it must have been cancelled.
-        QCOMPARE(rpc(socket, "getStatus")["data"].toObject()["state"].toString(), "RUNNING");
-        QCOMPARE(rpc(socket, "getStatus")["data"].toObject()["pid"].toInteger(), pid);
-        const auto entries = rpc(socket, "getLogs")["data"].toObject()["entries"].toArray();
+        QCOMPARE(instance(socket, id)["state"].toString(), "RUNNING");
+        QCOMPARE(instance(socket, id)["pid"].toInteger(), pid);
+        const auto entries = rpc(socket, "getLogs", {{"profileId", id}})["data"].toObject()["entries"].toArray();
         QVERIFY(!entries.isEmpty());
-        QVERIFY(rpc(socket, "stopServer")["ok"].toBool());
-        QTRY_COMPARE_WITH_TIMEOUT(rpc(socket, "getStatus")["data"].toObject()["state"].toString(), "STOPPED", 6000);
+        QVERIFY(rpc(socket, "stopServer", {{"profileId", id}})["ok"].toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(instance(socket, id)["state"].toString(), "STOPPED", 6000);
+        QVERIFY(rpc(socket, "deleteProfile", {{"profileId", id2}})["ok"].toBool());
+        QVERIFY(instance(socket, id2).isEmpty()); QVERIFY(!QDir(dir.path() + "/logs/" + id2).exists());
         // A malformed client must not take down the Agent.
         socket.write("garbage\n"); socket.flush(); QTRY_VERIFY(socket.state() == QLocalSocket::UnconnectedState);
         QCOMPARE(agent.state(), QProcess::Running);

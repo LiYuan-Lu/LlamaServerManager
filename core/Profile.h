@@ -3,6 +3,7 @@
 #include <QStringList>
 
 struct Profile {
+    QString id, name;
     QString executable, model, workingDirectory;
     QString host = "127.0.0.1";
     int port = 8080, context = 4096, gpuLayers = 0, threads = 4, parallel = 1;
@@ -13,4 +14,7 @@ struct Profile {
     static bool fromJson(const QJsonObject &, Profile &, QString &error);
     QString validate(bool checkFiles = true) const;
     QStringList arguments() const;
+    QString displayName() const;
+    static QString newId();
+    static bool validId(const QString &id);
 };

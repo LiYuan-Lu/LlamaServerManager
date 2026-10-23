@@ -14,11 +14,12 @@ AgentClient::AgentClient(QString dir, bool launch, QObject *parent) : QObject(pa
     retry.setInterval(1500);
     connect(&retry, &QTimer::timeout, this, &AgentClient::connectAgent); retry.start();
     connect(&socket, &QLocalSocket::connected, this, [this] {
-        buffer.clear(); sequence = 0; text.clear(); emit logsChanged(); setError({}); emit connectedChanged();
-        send("getStatus"); send("getLogs");
+        buffer.clear(); logs.clear(); synced = false; emit logsChanged(); setError({}); emit connectedChanged();
+        send("getStatus");
+        if (!selected.isEmpty()) send("getLogs", {{"profileId", selected}});
     });
     connect(&socket, &QLocalSocket::disconnected, this, [this] {
-        pending.clear(); buffer.clear(); emit busyChanged(); emit connectedChanged();
+        pending.clear(); buffer.clear(); synced = false; rebuild(); emit busyChanged(); emit connectedChanged();
         setError("Agent disconnected; displayed status is stale. Reconnecting...");
     });
     connect(&socket, &QLocalSocket::errorOccurred, this, [this](QLocalSocket::LocalSocketError) {
@@ -26,7 +27,11 @@ AgentClient::AgentClient(QString dir, bool launch, QObject *parent) : QObject(pa
         const auto now = QDateTime::currentMSecsSinceEpoch();
         if (autoLaunch && now - lastLaunch > 10000) {
             lastLaunch = now;
+#ifdef Q_OS_WIN
             const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent.exe";
+#else
+            const QString executable = QCoreApplication::applicationDirPath() + "/llama-manager-agent";
+#endif
             QProcess detached;
             detached.setProgram(executable);
             detached.setArguments({"--data-dir", directory});
@@ -45,13 +50,15 @@ AgentClient::AgentClient(QString dir, bool launch, QObject *parent) : QObject(pa
     expiry.setInterval(1000);
     connect(&expiry, &QTimer::timeout, this, [this] {
         const auto now = QDateTime::currentMSecsSinceEpoch();
+        bool changed = false;
         for (auto i = pending.begin(); i != pending.end();) {
-            if (now - i->second > 15000) { setError("Request timed out: " + i->first + ". State will be resynchronized; command is not retried."); i = pending.erase(i); emit busyChanged(); }
+            if (now - i->time > 15000) { setError("Request timed out: " + i->command + ". State will be resynchronized; command is not retried."); i = pending.erase(i); changed = true; }
             else ++i;
         }
+        if (changed) { rebuild(); emit busyChanged(); }
     }); expiry.start();
 }
-void AgentClient::setError(const QString &e) { lastError = e; emit errorChanged(); }
+void AgentClient::setError(const QString &e) { if (lastError == e) return; lastError = e; emit errorChanged(); }
 AgentClient::~AgentClient() {
     // QLocalSocket destruction can emit disconnected after later members died.
     disconnect(&socket, nullptr, this, nullptr);
@@ -65,26 +72,61 @@ void AgentClient::send(const QString &command, const QJsonObject &extra) {
     if (pending.size() >= 32) { setError("Too many pending requests"); return; }
     const auto id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     QJsonObject m = extra; m["version"] = 1; m["id"] = id; m["command"] = command;
-    pending[id] = {command, QDateTime::currentMSecsSinceEpoch()}; emit busyChanged();
-    if (!Protocol::send(&socket, m)) { pending.remove(id); emit busyChanged(); setError("Could not send request"); }
+    pending[id] = {command, extra["profileId"].toString(), QDateTime::currentMSecsSinceEpoch()};
+    rebuild(); emit busyChanged();
+    if (!Protocol::send(&socket, m)) { pending.remove(id); rebuild(); emit busyChanged(); setError("Could not send request"); }
 }
-void AgentClient::request(const QString &command) { setError({}); send(command); }
-void AgentClient::saveProfile(const QVariantMap &p) { setError({}); send("updateProfile", {{"profile", QJsonObject::fromVariantMap(p)}}); }
+void AgentClient::start(const QString &id) { setError({}); send("startServer", {{"profileId", id}}); }
+void AgentClient::stop(const QString &id) { setError({}); send("stopServer", {{"profileId", id}}); }
+void AgentClient::restart(const QString &id) { setError({}); send("restartServer", {{"profileId", id}}); }
+void AgentClient::createProfile(const QVariantMap &p) { setError({}); send("createProfile", {{"profile", QJsonObject::fromVariantMap(p)}}); }
+void AgentClient::saveProfile(const QString &id, const QVariantMap &p) {
+    setError({}); send("updateProfile", {{"profileId", id}, {"profile", QJsonObject::fromVariantMap(p)}});
+}
+void AgentClient::deleteProfile(const QString &id) { setError({}); send("deleteProfile", {{"profileId", id}}); }
 QString AgentClient::localPath(const QUrl &url) const { return url.toLocalFile(); }
-void AgentClient::clearLogs() { text.clear(); emit logsChanged(); }
-void AgentClient::applyStatus(const QJsonObject &data) {
-    state = data.toVariantMap(); emit statusChanged();
-    const auto p = data["profile"].toObject().toVariantMap();
-    if (p != savedProfile) { savedProfile = p; emit profileChanged(); }
+void AgentClient::clearLogs() { if (logs.contains(selected)) { logs[selected].text.clear(); emit logsChanged(); } }
+void AgentClient::setSelectedId(const QString &id) {
+    if (selected == id) return;
+    selected = id; emit selectedIdChanged(); emit logsChanged();
+    if (!id.isEmpty() && connected() && ids.contains(id)) send("getLogs", {{"profileId", id}});
 }
-void AgentClient::appendLog(const QJsonObject &record) {
+void AgentClient::rebuild() {
+    view.clear();
+    for (auto i = raw.begin(); i != raw.end(); ++i) {
+        auto entry = i.value().toMap();
+        bool busy = false;
+        for (const auto &p : pending) if (p.profileId == i.key()) { busy = true; break; }
+        entry["busy"] = busy;
+        view.insert(i.key(), entry);
+    }
+    emit instancesChanged();
+}
+void AgentClient::applyStatus(const QJsonObject &data) {
+    QStringList nextIds; QVariantMap next; QStringList changedProfiles;
+    for (const auto &value : data["instances"].toArray()) {
+        const auto o = value.toObject(); const auto id = o["id"].toString();
+        if (id.isEmpty()) continue;
+        nextIds << id; next.insert(id, o.toVariantMap());
+        const auto p = o["profile"].toObject().toVariantMap();
+        if (profiles.value(id) != p) { profiles[id] = p; changedProfiles << id; }
+    }
+    for (const auto &id : ids) if (!nextIds.contains(id)) { profiles.remove(id); logs.remove(id); }
+    raw = next; agentWarning = data["warning"].toString(); synced = true;
+    const bool idsChanged = nextIds != ids; ids = nextIds;
+    rebuild();
+    if (idsChanged) emit instanceIdsChanged();
+    for (const auto &id : changedProfiles) emit profileChanged(id);
+}
+void AgentClient::appendLog(const QString &profileId, const QJsonObject &record, bool notify) {
+    auto &log = logs[profileId];
     const auto n = record["sequence"].toInteger();
-    if (n <= sequence) return;
-    sequence = n;
-    text += QString("[%1] [%2] %3").arg(record["time"].toString(), record["channel"].toString(), record["text"].toString());
-    if (!text.endsWith('\n')) text += '\n';
-    if (text.size() > 256 * 1024) text = text.right(192 * 1024);
-    emit logsChanged();
+    if (n <= log.sequence) return;
+    log.sequence = n;
+    log.text += QString("[%1] [%2] %3").arg(record["time"].toString(), record["channel"].toString(), record["text"].toString());
+    if (!log.text.endsWith('\n')) log.text += '\n';
+    if (log.text.size() > 256 * 1024) log.text = log.text.right(192 * 1024);
+    if (notify && profileId == selected) emit logsChanged();
 }
 void AgentClient::receive() {
     buffer += socket.readAll();
@@ -95,21 +137,21 @@ void AgentClient::receive() {
         if (m.contains("event")) {
             const auto event = m["event"].toString();
             if (event == "status") applyStatus(data);
-            else if (event == "log") appendLog(data);
+            else if (event == "log") appendLog(data["profileId"].toString(), data);
             else if (event == "warning") setError(data["message"].toString());
         } else {
             const auto id = m["id"].toString();
             if (!pending.contains(id)) continue;
-            const auto command = pending.take(id).first; emit busyChanged();
+            const auto request = pending.take(id); rebuild(); emit busyChanged();
             if (!m["ok"].toBool()) { setError(m["error"].toString()); continue; }
-            if (command == "getStatus" || command == "updateProfile") {
-                applyStatus(data);
-                if (command == "updateProfile") emit profileChanged();
-            }
-            else if (command == "getLogs") {
-                text.clear(); sequence = 0;
-                for (const auto &entry : data["entries"].toArray()) appendLog(entry.toObject());
-                emit logsChanged();
+            if (data.contains("instances")) applyStatus(data);
+            if (request.command == "updateProfile") emit profileChanged(request.profileId);
+            else if (request.command == "createProfile") emit profileCreated(data["id"].toString());
+            else if (request.command == "getLogs") {
+                const auto profileId = data["profileId"].toString();
+                logs[profileId] = {};
+                for (const auto &entry : data["entries"].toArray()) appendLog(profileId, entry.toObject(), false);
+                if (profileId == selected) emit logsChanged();
             }
         }
     }

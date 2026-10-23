@@ -3,10 +3,12 @@
 #include <QJsonArray>
 #include <QHostAddress>
 #include <QSet>
+#include <QRegularExpression>
+#include <QUuid>
 #include <cmath>
 
 QJsonObject Profile::toJson() const {
-    return {{"executable", executable}, {"model", model}, {"workingDirectory", workingDirectory},
+    return {{"id", id}, {"name", name}, {"executable", executable}, {"model", model}, {"workingDirectory", workingDirectory},
         {"host", host}, {"port", port}, {"context", context}, {"gpuLayers", gpuLayers},
         {"threads", threads}, {"parallel", parallel}, {"metrics", metrics},
         {"extraArguments", QJsonArray::fromStringList(extraArguments)}, {"environment", environment}};
@@ -26,7 +28,8 @@ bool Profile::fromJson(const QJsonObject &o, Profile &p, QString &error) {
         }
         value = int(n); return true;
     };
-    if (!str("executable", candidate.executable) || !str("model", candidate.model)
+    if (!str("id", candidate.id) || !str("name", candidate.name)
+        || !str("executable", candidate.executable) || !str("model", candidate.model)
         || !str("workingDirectory", candidate.workingDirectory) || !str("host", candidate.host)
         || !number("port", candidate.port) || !number("context", candidate.context)
         || !number("gpuLayers", candidate.gpuLayers) || !number("threads", candidate.threads)
@@ -47,6 +50,8 @@ bool Profile::fromJson(const QJsonObject &o, Profile &p, QString &error) {
 QString Profile::validate(bool files) const {
     if (port < 1 || port > 65535 || context < 1 || gpuLayers < -1 || threads < 1 || parallel < 1)
         return "Invalid port/context/GPU layers/threads/parallel value";
+    if (!id.isEmpty() && !validId(id)) return "Invalid profile ID";
+    if (name.size() > 128 || name.contains(QChar::Null)) return "Name must be at most 128 characters";
     if (QHostAddress(host).isNull()) return "Host must be a numeric IPv4 or IPv6 address";
     if (executable.contains(QChar::Null) || model.contains(QChar::Null) || workingDirectory.contains(QChar::Null)) return "Invalid path";
     if (files) {
@@ -66,4 +71,14 @@ QStringList Profile::arguments() const {
         "-t", QString::number(threads), "--host", host, "--port", QString::number(port), "--parallel", QString::number(parallel)};
     if (metrics) a << "--metrics";
     return a + extraArguments;
+}
+QString Profile::displayName() const {
+    if (!name.trimmed().isEmpty()) return name.trimmed();
+    const auto base = QFileInfo(model).completeBaseName();
+    return base.isEmpty() ? QStringLiteral("Model") : base;
+}
+QString Profile::newId() { return QUuid::createUuid().toString(QUuid::WithoutBraces); }
+bool Profile::validId(const QString &id) {
+    static const QRegularExpression re("^[A-Za-z0-9_-]{1,64}$");
+    return re.match(id).hasMatch();
 }

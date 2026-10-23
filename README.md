@@ -1,6 +1,6 @@
 # Llama Server Manager — Phase 1
 
-A Windows x64 manager for a single llama-server instance, built with Qt 6, QML, C++17, and CMake. The GUI and Agent are separate executables. Closing or crashing the GUI does not stop the Agent or model. Phase 2–4 features, including watchdog recovery, HTTP health monitoring, resource monitoring, multiple profiles and instances, the system tray, and Windows Service support, are not implemented.
+A Windows x64 manager for multiple llama-server instances, built with Qt 6, QML, C++17, and CMake. The GUI and Agent are separate executables. Closing or crashing the GUI does not stop the Agent or model. Phase 2–4 features, including watchdog recovery, HTTP health monitoring, resource monitoring, the system tray, and Windows Service support, are not implemented.
 
 The Phase 1 implementation passed all seven tests in both Release and Debug builds. A real 9B GGUF model was also used to verify loading, GUI reconnection, and shutdown. After completing the build and deployment steps below, launch `deploy/llama-manager.exe`.
 
@@ -27,9 +27,9 @@ ctest --test-dir build -C Release --output-on-failure
 The GUI is available in English and Traditional Chinese. On first launch, it follows the Windows display language; use the EN / 中文 button in the top-right corner to switch at any time. The choice is saved per user in `HKEY_CURRENT_USER\Software\LlamaServerManager\llama-manager`.
 
 1. Launch `llama-manager.exe`. The GUI connects asynchronously and starts `llama-manager-agent.exe` from the same directory if no Agent is available.
-2. Use the browse buttons to select your `llama-server.exe` and `.gguf` file. Configure the working directory, host, port, context size, GPU layers, threads, parallel slots, and metrics as needed.
+2. The main window is a grid of model cards. Click the **+** card to add a model, or click a card to open its details. Each card has one Start/Stop toggle button and a Restart button, so models can be controlled straight from the grid. In the editor, give the model a name and use the browse buttons to select your `llama-server.exe` and `.gguf` file. Configure the working directory, host, port, context size, GPU layers, threads, parallel slots, and metrics as needed.
 3. Enter extra arguments as a JSON string array, such as `["--verbose"]`. Each element is one argument. Enter environment variables as a JSON object, such as `{"CUDA_VISIBLE_DEVICES":"0"}`. No shell is involved.
-4. Save the profile, then start the server. The Agent first inspects the executable's `--help` output with a 10-second timeout. It rejects startup if required flags are missing. The selected llama.cpp version validates additional arguments; errors appear on stderr.
+4. Save the profile (or click **Add model** for a new one), then start the server. The Agent first inspects the executable's `--help` output with a 10-second timeout. It rejects startup if required flags are missing. The selected llama.cpp version validates additional arguments; errors appear on stderr.
 5. Inspect the PID, port, uptime, stdout, and stderr. `RUNNING` means the operating system has started the process; it does not mean the GGUF model is loaded or the API is ready. Check the logs for loading progress.
 6. Stop first calls terminate, then forcibly ends the owned process if it is still running after three seconds. Windows console processes often require this fallback. Restart is an explicit manual action.
 7. Close the GUI without stopping the Agent or model. Reopening it restores the current state and recent logs retained by the Agent.
@@ -38,11 +38,12 @@ The Agent can also run independently as `llama-manager-agent.exe`. Both executab
 
 ## Data and limitations
 
-- The single profile is stored in `%APPDATA%/LlamaServerManager/profiles.json`, using schema version 1. QSaveFile provides atomic writes. The previous valid version is retained as `.bak`; invalid data falls back to the backup or defaults with a warning.
-- Logs are stored in `logs/server.jsonl` under the same data directory. Each file is limited to 4 MiB, with three rotated files retained, for approximately 16 MiB total. Recent replay is limited to 1,000 records or 256 KiB. GUI text is also bounded. Clearing the view does not delete disk logs.
+- All model profiles are stored in `%APPDATA%/LlamaServerManager/profiles.json`, using schema version 2 (`{"version":2,"profiles":[...]}`, at most 64 models). A Phase 1 version 1 file is migrated automatically on first Agent start: its single profile becomes one model with a generated ID, and the original file is kept as `.bak`. QSaveFile provides atomic writes. The previous valid version is retained as `.bak`; invalid data falls back to the backup or an empty list with a warning.
+- Logs are stored per model in `logs/<profile-id>/server.jsonl` under the same data directory. Deleting a model deletes its log folder. Each file is limited to 4 MiB, with three rotated files retained, for approximately 16 MiB total. Recent replay is limited to 1,000 records or 256 KiB. GUI text is also bounded. Clearing the view does not delete disk logs.
 - There is no automatic restart. Unexpected exits show FAILED and the exit code. A manual stop leaves the server stopped.
 - The single-Agent lock is scoped to the data directory. The named pipe is restricted to the current user; it is not a security boundary against untrusted programs running as that user.
 - A Windows Job Object manages the owned model process and subsequent descendants. If assignment is rejected, the Agent logs a warning and falls back to managing the direct child. See the architecture document for limitations.
+- Starting a model is refused while another active model uses the same port (including wildcard hosts). Several models may run at once; each has its own process, Job Object, and log, and stopping one never affects another. The Agent does not check whether GPU memory is sufficient for all running models.
 - A port preflight check reduces conflicts but cannot eliminate the race before the child binds the port. Actual failures appear through process termination and stderr.
 - Models and llama-server are not bundled. No Python runtime is required.
 
@@ -80,7 +81,9 @@ If windeployqt cannot locate Visual Studio, run it from a Visual Studio Develope
 apps/agent/main.cpp           Agent entry point and single-instance lock
 apps/gui/main.cpp             QML entry point and AgentClient injection
 apps/gui/LanguageManager.*    Runtime language switching with QTranslator
-apps/gui/qml/Main.qml         Status and server controls
+apps/gui/qml/Main.qml         Model grid (cards + add button) and page navigation
+apps/gui/qml/ModelCard.qml    One model's status with Start/Stop toggle and Restart
+apps/gui/qml/ModelPage.qml    Model detail: controls, profile editor, logs, delete
 apps/gui/qml/ProfileEditor.qml  Paths, arguments, and file dialogs
 apps/gui/qml/LogView.qml       Live logs
 core/Profile.*               Data types, validation, and argument arrays

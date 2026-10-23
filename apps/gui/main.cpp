@@ -9,6 +9,7 @@
 #include <QCommandLineParser>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QTimer>
 int main(int argc, char **argv) {
     QGuiApplication app(argc, argv); app.setApplicationName("LlamaServerManager");
     LanguageManager languageManager;
@@ -31,9 +32,11 @@ int main(int argc, char **argv) {
         });
         QTimer::singleShot(4000, &app, [&app, &client] {
             const auto expected = qEnvironmentVariable("LSM_EXPECTED_PID");
-            const bool synchronized = client.connected() && client.status().contains("state")
-                && (expected.isEmpty() || client.status().value("pid").toString() == expected);
-            if (!synchronized) qWarning() << "Smoke sync failed" << client.connected() << client.status() << client.error() << "expected" << expected;
+            bool found = expected.isEmpty();
+            const auto instances = client.instances();
+            for (const auto &value : instances) found = found || value.toMap().value("pid").toString() == expected;
+            const bool synchronized = client.connected() && client.synchronized() && found;
+            if (!synchronized) qWarning() << "Smoke sync failed" << client.connected() << instances << client.error() << "expected" << expected;
             app.exit(synchronized ? 0 : 2);
         });
     }

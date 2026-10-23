@@ -15,7 +15,9 @@ add_library(lsm_ipc STATIC ipc/Protocol.cpp ipc/AgentServer.cpp ipc/AgentClient.
 target_link_libraries(lsm_ipc PUBLIC lsm_core)
 qt_add_executable(llama-manager-agent apps/agent/main.cpp)
 target_link_libraries(llama-manager-agent PRIVATE lsm_ipc)
-set(LSM_GUI_QML apps/gui/qml/Main.qml apps/gui/qml/ProfileEditor.qml apps/gui/qml/LogView.qml)
+set(LSM_GUI_QML apps/gui/qml/Main.qml apps/gui/qml/ModelCard.qml apps/gui/qml/AddCard.qml apps/gui/qml/ModelPage.qml
+  apps/gui/qml/ServerControls.qml apps/gui/qml/StateBadge.qml apps/gui/qml/ProfileEditor.qml apps/gui/qml/LogView.qml
+  apps/gui/qml/Theme.js)
 # QML files are listed as sources so lupdate scans them for qsTr().
 qt_add_executable(llama-manager WIN32 apps/gui/main.cpp apps/gui/LanguageManager.cpp ${LSM_GUI_QML})
 target_link_libraries(llama-manager PRIVATE lsm_ipc Qt6::Quick Qt6::QuickControls2)
