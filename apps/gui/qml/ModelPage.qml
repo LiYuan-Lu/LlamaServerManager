@@ -14,6 +14,26 @@ Item {
     readonly property var info: agent.instances[profileId] || ({})
     readonly property string serverState: info.state || "STOPPED"
     readonly property bool idle: serverState === "STOPPED" || serverState === "FAILED"
+    // Generation speed from GET /slots, sampled by the Agent once per second.
+    readonly property var throughput: info.throughput || ({})
+    readonly property var speedSeries: agent.throughputHistory[profileId] || ({ times: [], values: [] })
+    readonly property string speedText: {
+        if (!info.pid) return "—"
+        if (throughput.available !== true) return (throughput.reason || "").indexOf("disabled") >= 0 ? qsTr("off") : "—"
+        if (throughput.activeSlots > 0) return qsTr("%1 tok/s").arg(Number(throughput.tokensPerSecond).toFixed(1))
+        return qsTr("idle")
+    }
+    readonly property string speedDetail: {
+        if (throughput.available !== true) {
+            if (!info.pid) return qsTr("Not running")
+            return (throughput.reason || "").indexOf("disabled") >= 0
+                ? qsTr("The /slots endpoint is disabled (--no-slots), so the speed is not available")
+                : qsTr("Waiting for /slots")
+        }
+        const parts = [qsTr("Busy slots %1/%2").arg(throughput.activeSlots).arg(throughput.slots)]
+        if (throughput.lastTokensPerSecond > 0) parts.unshift(qsTr("Last generation %1 tok/s").arg(Number(throughput.lastTokensPerSecond).toFixed(1)))
+        return parts.join("  ·  ")
+    }
     signal back()
     signal duplicate(var profile)
     // Leaving with unsaved edits asks first: save, discard, or keep editing.
@@ -213,6 +233,11 @@ Item {
                 Label { text: qsTr("Uptime  %1").arg(page.info.pid ? Theme.duration(page.info.uptimeSeconds) : "—") }
                 Label { text: qsTr("Health  %1").arg(page.healthText(page.info.health)); elide: Text.ElideRight; Layout.fillWidth: true }
                 Label {
+                    text: qsTr("Speed  %1").arg(page.speedText)
+                    ToolTip.visible: speedHover.hovered; ToolTip.text: page.speedDetail
+                    HoverHandler { id: speedHover }
+                }
+                Label {
                     text: qsTr("Restarts  %1/%2").arg(page.info.restartsInWindow || 0).arg(page.info.maxRestarts === undefined ? "—" : page.info.maxRestarts)
                     ToolTip.visible: restartsHover.hovered; ToolTip.text: qsTr("Automatic restarts within the restart window")
                     HoverHandler { id: restartsHover }
@@ -271,12 +296,23 @@ Item {
                     id: tabs
                     TabButton { text: qsTr("Console"); width: implicitWidth + 24 }
                     TabButton { text: qsTr("Restart history (%1)").arg(agent.restartHistory.length); width: implicitWidth + 24 }
+                    TabButton { text: qsTr("Speed"); width: implicitWidth + 24 }
                 }
                 StackLayout {
                     currentIndex: tabs.currentIndex
                     Layout.fillWidth: true; Layout.fillHeight: true
                     LogView {}
                     RestartHistoryView {}
+                    MetricTile {
+                        title: qsTr("Generation speed (tokens per second, all slots)")
+                        value: page.speedText
+                        detail: page.speedDetail
+                        accent: "#a78bfa"
+                        times: page.speedSeries.times
+                        values: page.speedSeries.values
+                        maxValue: Math.max(10, Math.ceil(Math.max.apply(null, page.speedSeries.values.concat([0])) * 1.2 / 10) * 10)
+                        emptyText: page.speedSeries.times.length > 0 ? "" : page.info.pid ? qsTr("No samples yet. The speed appears while the model runs.") : qsTr("Start the model to see its generation speed")
+                    }
                 }
             }
         }

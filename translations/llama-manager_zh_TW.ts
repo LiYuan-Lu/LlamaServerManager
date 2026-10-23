@@ -274,6 +274,11 @@
         <translation>  ·  已執行 %1</translation>
     </message>
     <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="63"/>
+        <source>  ·  %1 tok/s</source>
+        <translation>  ·  %1 tok/s</translation>
+    </message>
+    <message>
         <location filename="../apps/gui/qml/ModelCard.qml" line="31"/>
         <source>Restart %1/%2 in %3 s</source>
         <translation>%3 秒後第 %1/%2 次重啟</translation>
@@ -328,208 +333,269 @@
 <context>
     <name>ModelPage</name>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="189"/>
         <source>Delete model</source>
         <translation>刪除模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="171"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="191"/>
         <source>Delete &quot;%1&quot;? Its profile and logs will be removed. The model file itself is not touched.</source>
         <translation>要刪除「%1」嗎？其設定檔與日誌會被移除，模型檔案本身不受影響。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="179"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="199"/>
         <source>← All models</source>
         <translation>← 所有模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="181"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
         <source>New model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="181"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
         <source>New model (copy)</source>
         <translation>新增模型（複本）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="189"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="209"/>
         <source>Read the model ID from /v1/models and show a config for opencode</source>
         <translation>從 /v1/models 讀取模型 ID，並產生 opencode 設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="194"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="214"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="196"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="216"/>
         <source>Create a new model with a copy of these settings</source>
         <translation>用這些設定的複本建立新模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="221"/>
         <source>Delete</source>
         <translation>刪除</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="211"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="231"/>
         <source>PID  %1</source>
         <translation>PID  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="212"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="232"/>
         <source>Port  %1</source>
         <translation>Port  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="213"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="233"/>
         <source>Uptime  %1</source>
         <translation>執行時間  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="214"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="234"/>
         <source>Health  %1</source>
         <translation>健康狀態  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="216"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="241"/>
         <source>Restarts  %1/%2</source>
         <translation>重啟次數  %1/%2</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="217"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="242"/>
         <source>Automatic restarts within the restart window</source>
         <translation>重啟時間窗內的自動重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="229"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="254"/>
         <source>With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.</source>
         <translation>啟用健康檢查時，模型會維持 STARTING，直到 GET /health 回傳 200 才變成 RUNNING。健康檢查失敗、程序當掉或啟動失敗時，會以遞增的等待時間自動重啟；按下停止一定會取消自動重啟。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="272"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="297"/>
         <source>Console</source>
         <translation>主控台</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="298"/>
         <source>Restart history (%1)</source>
         <translation>重啟紀錄（%1）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="45"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="65"/>
         <source>Healthy</source>
         <translation>健康</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="46"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="66"/>
         <source>Health checks off</source>
         <translation>未啟用健康檢查</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="47"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="28"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="67"/>
         <source>Not running</source>
         <translation>未執行</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="48"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="22"/>
+        <source>off</source>
+        <translation>已關閉</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="23"/>
+        <source>%1 tok/s</source>
+        <translation>%1 tok/s</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="24"/>
+        <source>idle</source>
+        <translation>閒置</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="30"/>
+        <source>The /slots endpoint is disabled (--no-slots), so the speed is not available</source>
+        <translation>/slots 端點已停用（--no-slots），無法取得速度</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="31"/>
+        <source>Waiting for /slots</source>
+        <translation>等待 /slots</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="33"/>
+        <source>Busy slots %1/%2</source>
+        <translation>忙碌中的處理槽 %1/%2</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="34"/>
+        <source>Last generation %1 tok/s</source>
+        <translation>上次生成 %1 tok/s</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="68"/>
         <source>Loading model (HTTP 503)</source>
         <translation>模型載入中（HTTP 503）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="49"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="69"/>
         <source>Waiting for /health</source>
         <translation>等待 /health 回應</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="106"/>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="187"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="126"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="207"/>
         <source>opencode config</source>
         <translation>opencode 設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="129"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="149"/>
         <source>Paste into opencode.json. If the file already has a &quot;provider&quot; section, add this provider to it.</source>
         <translation>貼到 opencode.json。如果檔案裡已經有「provider」區段，請把這個 provider 加進去。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="132"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="152"/>
         <source>Reading /v1/models and /props…</source>
         <translation>正在讀取 /v1/models 和 /props…</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="150"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="170"/>
         <source>Copied</source>
         <translation>已複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="150"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="170"/>
         <source>Copy</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="159"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="179"/>
         <source>Close</source>
         <translation>關閉</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="240"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="236"/>
+        <source>Speed  %1</source>
+        <translation>速度  %1</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="265"/>
         <source>Add model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="240"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="265"/>
         <source>Save profile</source>
         <translation>儲存設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="245"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="270"/>
         <source>Revert changes</source>
         <translation>還原編輯</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="247"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="272"/>
         <source>Fill in the paths, then add the model to the list</source>
         <translation>填好路徑後，將模型加入清單</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="248"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
         <source>Unsaved changes; save before starting</source>
         <translation>尚未儲存；儲存後才能啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="248"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
         <source>Starts with the saved profile</source>
         <translation>使用已儲存的設定啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="74"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="299"/>
+        <source>Speed</source>
+        <translation>速度</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="307"/>
+        <source>Generation speed (tokens per second, all slots)</source>
+        <translation>生成速度（每秒 token 數，所有處理槽合計）</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="314"/>
+        <source>No samples yet. The speed appears while the model runs.</source>
+        <translation>尚無資料。模型運作時會顯示速度。</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="314"/>
+        <source>Start the model to see its generation speed</source>
+        <translation>啟動模型後即可查看生成速度</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="94"/>
         <source>Unsaved changes</source>
         <translation>尚未儲存的變更</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="79"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="99"/>
         <source>This model has unsaved changes. Save them before leaving?</source>
         <translation>這個模型有尚未儲存的變更，離開前要先儲存嗎？</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="83"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="103"/>
         <source>Add and leave</source>
         <translation>新增後離開</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="83"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="103"/>
         <source>Save and leave</source>
         <translation>儲存後離開</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="89"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="109"/>
         <source>Discard changes</source>
         <translation>捨棄變更</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="94"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="114"/>
         <source>Keep editing</source>
         <translation>繼續編輯</translation>
     </message>

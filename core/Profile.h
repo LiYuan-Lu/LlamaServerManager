@@ -37,6 +37,8 @@ struct Profile {
     QString validate(bool checkFiles = true) const;
     QStringList arguments() const;
     QString displayName() const;
+    // The first key of --api-key in the extra arguments, or empty.
+    QString apiKey() const;
     static QString newId();
     static bool validId(const QString& id);
 };

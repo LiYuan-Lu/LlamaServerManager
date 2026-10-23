@@ -175,6 +175,20 @@ QString Profile::displayName() const
     const auto base = QFileInfo(model).completeBaseName();
     return base.isEmpty() ? QStringLiteral("Model") : base;
 }
+QString Profile::apiKey() const
+{
+    for (int i = 0; i < extraArguments.size(); ++i) {
+        const auto& arg = extraArguments[i];
+        // llama-server accepts a comma-separated list; any of the keys works.
+        if (arg == "--api-key") {
+            return extraArguments.value(i + 1).section(',', 0, 0);
+        }
+        if (arg.startsWith("--api-key=")) {
+            return arg.mid(10).section(',', 0, 0);
+        }
+    }
+    return { };
+}
 QString Profile::newId() { return QUuid::createUuid().toString(QUuid::WithoutBraces); }
 bool Profile::validId(const QString& id)
 {

@@ -295,6 +295,7 @@ void AgentClient::applyStatus(const QJsonObject& data)
     QStringList nextIds;
     QVariantMap next;
     QStringList changedProfiles;
+    const auto now = QDateTime::currentMSecsSinceEpoch();
     for (const auto& value : data["instances"].toArray()) {
         const auto o = value.toObject();
         const auto id = o["id"].toString();
@@ -303,6 +304,7 @@ void AgentClient::applyStatus(const QJsonObject& data)
         }
         nextIds << id;
         next.insert(id, o.toVariantMap());
+        recordThroughput(id, o["throughput"].toObject(), now);
         const auto p = o["profile"].toObject().toVariantMap();
         if (profiles.value(id) != p) {
             profiles[id] = p;
@@ -313,6 +315,7 @@ void AgentClient::applyStatus(const QJsonObject& data)
         if (!nextIds.contains(id)) {
             profiles.remove(id);
             logs.remove(id);
+            speed.remove(id);
             if (id == selected) {
                 console.reset({ });
             }
@@ -330,6 +333,32 @@ void AgentClient::applyStatus(const QJsonObject& data)
     for (const auto& id : changedProfiles) {
         emit profileChanged(id);
     }
+    emit throughputHistoryChanged();
+}
+void AgentClient::recordThroughput(const QString& id, const QJsonObject& throughput, qint64 now)
+{
+    if (!throughput["available"].toBool()) {
+        return; // stopped or no /slots: the chart shows a gap
+    }
+    auto& series = speed[id];
+    // Replies to commands also carry a snapshot; keep about one point per second.
+    if (!series.times.isEmpty() && now - series.times.last().toLongLong() < 500) {
+        return;
+    }
+    series.times.append(now);
+    series.values.append(throughput["tokensPerSecond"].toDouble());
+    while (!series.times.isEmpty() && now - series.times.first().toLongLong() > MetricsCollector::HistorySeconds * 1000LL) {
+        series.times.removeFirst();
+        series.values.removeFirst();
+    }
+}
+QVariantMap AgentClient::throughputHistory() const
+{
+    QVariantMap map;
+    for (auto i = speed.begin(); i != speed.end(); ++i) {
+        map.insert(i.key(), QVariantMap { { "times", i->times }, { "values", i->values } });
+    }
+    return map;
 }
 void AgentClient::appendLog(const QString& profileId, const QJsonObject& record, bool notify)
 {

@@ -10,6 +10,8 @@
 #include "core/RestartPolicy.h"
 #include "core/ServerSupervisor.h"
 #include "core/SystemMonitor.h"
+#include "core/ThroughputMonitor.h"
+#include "ipc/AgentClient.h"
 #include "ipc/LogModel.h"
 #include "ipc/Protocol.h"
 #include <QFile>
@@ -381,6 +383,72 @@ private slots:
         // FAILED after the grace period: the stuck process is not left running.
         QTRY_VERIFY_WITH_TIMEOUT(supervisor.status()["pid"].toInteger() == 0, 6000);
     }
+    void throughputMeter()
+    {
+        const auto sample = [](qint64 task, qint64 decoded, bool processing) {
+            return QJsonArray { QJsonObject { { "id", 0 }, { "id_task", task }, { "is_processing", processing },
+                                    { "next_token", QJsonObject { { "n_decoded", decoded } } } },
+                QJsonObject { { "id", 1 }, { "id_task", -1 }, { "is_processing", false }, { "next_token", QJsonObject { { "n_decoded", 0 } } } } };
+        };
+        ThroughputMeter m;
+        m.add(sample(5, 10, true), 0); // baseline: earlier tokens are not counted
+        QCOMPARE(m.tokensPerSecond(), 0.0);
+        QCOMPARE(m.slotCount(), 2);
+        QCOMPARE(m.activeSlots(), 1);
+        m.add(sample(5, 50, true), 1000);
+        QCOMPARE(m.tokensPerSecond(), 40.0);
+        m.add(sample(5, 60, false), 2000); // finished: the burst average becomes the last speed
+        QCOMPARE(m.tokensPerSecond(), 10.0);
+        QCOMPARE(m.activeSlots(), 0);
+        QCOMPARE(m.lastTokensPerSecond(), 25.0);
+        // A new task keeps the previous count until its prompt is processed; that is not new output.
+        m.add(sample(6, 60, true), 3000);
+        QCOMPARE(m.tokensPerSecond(), 0.0);
+        m.add(sample(6, 60, true), 4000);
+        QCOMPARE(m.tokensPerSecond(), 0.0);
+        m.add(sample(6, 30, true), 5000); // counter restarted and 30 tokens generated
+        QCOMPARE(m.tokensPerSecond(), 30.0);
+        m.add(sample(7, 5, true), 6000); // smaller than before: already the new task's count
+        QCOMPARE(m.tokensPerSecond(), 5.0);
+        m.add(sample(8, 5, true), 7000); // ambiguous until the counter moves
+        QCOMPARE(m.tokensPerSecond(), 0.0);
+        m.add(sample(8, 45, true), 8000);
+        QCOMPARE(m.tokensPerSecond(), 45.0);
+        QCOMPARE(m.generatedTokens(), qint64(40 + 10 + 30 + 5 + 45));
+        // Older servers: next_token is an array and the state is a number.
+        ThroughputMeter old;
+        const auto legacy = [](qint64 decoded) {
+            return QJsonArray { QJsonObject { { "id", 0 }, { "id_task", 3 }, { "state", 1 }, { "next_token", QJsonArray { QJsonObject { { "n_decoded", decoded } } } } } };
+        };
+        old.add(legacy(0), 0);
+        old.add(legacy(20), 500);
+        QCOMPARE(old.tokensPerSecond(), 40.0);
+        QCOMPARE(old.activeSlots(), 1);
+    }
+    void throughputMonitor()
+    {
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        ServerSupervisor supervisor("speed", dir.path() + "/history.json");
+        auto p = profile(dir.path());
+        p.environment = { { "FAKE_GENERATE_TPS", "200" } };
+        QCOMPARE(supervisor.status()["throughput"].toObject()["available"].toBool(), false);
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.status()["throughput"].toObject()["tokensPerSecond"].toDouble() > 0, 8000);
+        const auto speed = supervisor.status()["throughput"].toObject();
+        QVERIFY(speed["available"].toBool());
+        QVERIFY2(speed["tokensPerSecond"].toDouble() > 100 && speed["tokensPerSecond"].toDouble() < 300, qPrintable(QJsonDocument(speed).toJson()));
+        QCOMPARE(speed["activeSlots"].toInt(), 1);
+        QCOMPARE(speed["slots"].toInt(), 2);
+        supervisor.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+        QCOMPARE(supervisor.status()["throughput"].toObject()["available"].toBool(), false);
+        // --no-slots: reported once, then no more polling.
+        p.environment = { { "FAKE_NO_SLOTS", "1" } };
+        QVERIFY(supervisor.start(p).isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(supervisor.status()["throughput"].toObject()["reason"].toString().contains("disabled"), 8000);
+        supervisor.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(supervisor.state(), QString("STOPPED"), 6000);
+    }
     void watchdogCrashRecovery()
     {
         TimeScale scale;
@@ -630,7 +698,7 @@ private slots:
         QCOMPARE(entries["b"].toObject()["name"].toString(), QString("Qwen3 8B (b)"));
         QCOMPARE(config["provider"].toObject()["llamacpp-8081"].toObject()["options"].toObject()["apiKey"].toString(), QString("secret"));
         p.extraArguments = { "--api-key=k2" };
-        QCOMPARE(OpencodeConfig::apiKey(p), QString("k2"));
+        QCOMPARE(p.apiKey(), QString("k2"));
     }
     void opencodeConfigFetch()
     {
@@ -1064,6 +1132,44 @@ private slots:
         model.reset({ });
         QCOMPARE(model.rowCount(), 0);
         QCOMPARE(model.errorCount(), 0);
+    }
+    void clientThroughputAndOpencode()
+    {
+        // The GUI client collects the speed history and builds the opencode config end to end.
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        QVERIFY(dir.isValid());
+        QProcess agent;
+        struct Cleanup {
+            QProcess& p;
+            ~Cleanup()
+            {
+                p.kill();
+                p.waitForFinished(5000);
+            }
+        } cleanup { agent };
+        QLocalSocket socket;
+        QVERIFY(launchAgent(agent, socket, dir.path()));
+        auto p = profile(dir.path());
+        p.name = "Speedy";
+        p.aliasEnabled = true;
+        p.alias = "speedy-1";
+        p.environment = { { "FAKE_GENERATE_TPS", "100" } };
+        const auto id = rpc(socket, "createProfile", { { "profile", p.toJson() } })["data"].toObject()["id"].toString();
+        QVERIFY(!id.isEmpty());
+        QVERIFY(rpc(socket, "startServer", { { "profileId", id } })["ok"].toBool());
+        AgentClient client(dir.path(), false);
+        const auto speed = [&client, &id] { return client.throughputHistory().value(id).toMap()["values"].toList(); };
+        QTRY_VERIFY_WITH_TIMEOUT(speed().size() >= 2 && speed().last().toDouble() > 0, 15000);
+        QSignalSpy ready(&client, &AgentClient::opencodeConfigReady);
+        client.requestOpencodeConfig(id);
+        QVERIFY(ready.wait(5000));
+        QCOMPARE(ready[0][0].toString(), id);
+        QVERIFY2(ready[0][2].toString().isEmpty(), qPrintable(ready[0][2].toString()));
+        const auto config = QJsonDocument::fromJson(ready[0][1].toString().toUtf8()).object();
+        const auto model = config["provider"].toObject()[QString("llamacpp-%1").arg(p.port)].toObject()["models"].toObject()["speedy-1"].toObject();
+        QCOMPARE(model["name"].toString(), QString("Speedy"));
+        QVERIFY(rpc(socket, "shutdownAgent")["ok"].toBool());
+        QVERIFY(agent.waitForFinished(20000));
     }
     void autoStartAndShutdown()
     {

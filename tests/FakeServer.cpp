@@ -26,6 +26,8 @@
 //   FAKE_RSS_MB               allocate and touch this many MiB so the process has a realistic size
 // GET /v1/models reports --alias (or the -m path) as the model ID; GET /props reports the
 // per-slot context (-c divided by --parallel).
+//   FAKE_GENERATE_TPS         GET /slots shows slot 0 generating this many tokens per second
+//   FAKE_NO_SLOTS             GET /slots returns 501, like llama-server --no-slots
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
@@ -68,10 +70,21 @@ int main(int argc, char** argv)
                                       .toJson(QJsonDocument::Compact);
     const QByteArray propsBody = QJsonDocument(QJsonObject { { "default_generation_settings", QJsonObject { { "n_ctx", slotContext } } } })
                                      .toJson(QJsonDocument::Compact);
+    const int generateTps = qEnvironmentVariableIntValue("FAKE_GENERATE_TPS");
+    const bool noSlots = qEnvironmentVariableIsSet("FAKE_NO_SLOTS");
+    const auto slotsBody = [&started, generateTps, slotContext] {
+        const bool generating = generateTps > 0;
+        const auto slot = [slotContext](int id, bool processing, int task, qint64 decoded) {
+            return QJsonObject { { "id", id }, { "n_ctx", slotContext }, { "speculative", false }, { "is_processing", processing }, { "id_task", task },
+                { "next_token", QJsonObject { { "has_next_token", processing }, { "has_new_line", false }, { "n_remain", -1 }, { "n_decoded", decoded } } } };
+        };
+        return QJsonDocument(QJsonArray { slot(0, generating, generating ? 1 : -1, generating ? started.elapsed() * generateTps / 1000 : 0), slot(1, false, -1, 0) })
+            .toJson(QJsonDocument::Compact);
+    };
     QObject::connect(&listener, &QTcpServer::newConnection, &app, [&] {
         while (QTcpSocket* socket = listener.nextPendingConnection()) {
             QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
-            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &started, loadingMs, hangAfterMs, &modelsBody, &propsBody] {
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &started, loadingMs, hangAfterMs, &modelsBody, &propsBody, &slotsBody, noSlots] {
                 const auto request = socket->property("buffer").toByteArray() + socket->readAll();
                 if (!request.contains("\r\n\r\n")) {
                     socket->setProperty("buffer", request);
@@ -87,6 +100,13 @@ int main(int argc, char** argv)
                     body = modelsBody;
                 } else if (request.startsWith("GET /props ")) {
                     body = propsBody;
+                } else if (request.startsWith("GET /slots ")) {
+                    if (noSlots) {
+                        status = "501 Not Implemented";
+                        body = R"({"error":{"code":501,"message":"This server does not support slots endpoint."}})";
+                    } else {
+                        body = slotsBody();
+                    }
                 } else if (!request.startsWith("GET /health ")) {
                     status = "404 Not Found";
                     body = "{}";

@@ -23,20 +23,6 @@ QUrl OpencodeConfig::baseUrl(const Profile& p)
     url.setPath("/v1");
     return url;
 }
-QString OpencodeConfig::apiKey(const Profile& p)
-{
-    for (int i = 0; i < p.extraArguments.size(); ++i) {
-        const auto& arg = p.extraArguments[i];
-        if (arg == "--api-key") {
-            // llama-server accepts a comma-separated list; any of the keys works.
-            return p.extraArguments.value(i + 1).section(',', 0, 0);
-        }
-        if (arg.startsWith("--api-key=")) {
-            return arg.mid(int(qstrlen("--api-key="))).section(',', 0, 0);
-        }
-    }
-    return { };
-}
 QJsonObject OpencodeConfig::build(const Profile& p, const QJsonObject& modelList, const QJsonObject& serverProps, QString& error)
 {
     QStringList ids;
@@ -70,7 +56,7 @@ QJsonObject OpencodeConfig::build(const Profile& p, const QJsonObject& modelList
         };
     }
     QJsonObject options { { "baseURL", baseUrl(p).toString() } };
-    if (const auto key = apiKey(p); !key.isEmpty()) {
+    if (const auto key = p.apiKey(); !key.isEmpty()) {
         options["apiKey"] = key;
     }
     const QJsonObject provider {
@@ -91,7 +77,7 @@ QNetworkReply* OpencodeConfig::get(const QString& path, int timeoutMs)
     QNetworkRequest request(url);
     request.setTransferTimeout(timeoutMs);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
-    if (const auto key = apiKey(profile); !key.isEmpty()) {
+    if (const auto key = profile.apiKey(); !key.isEmpty()) {
         request.setRawHeader("Authorization", "Bearer " + key.toUtf8());
     }
     auto* reply = network.get(request);

@@ -26,6 +26,9 @@ class AgentClient : public QObject {
     // Last 5 minutes: [{time, cpu, ramUsed, ramTotal, gpus: [{util, memUsed, memTotal}]}], oldest first.
     Q_PROPERTY(QVariantList metricsHistory READ metricsHistory NOTIFY metricsChanged)
     Q_PROPERTY(int metricsInterval READ metricsInterval NOTIFY metricsIntervalChanged)
+    // Generation speed of the last 5 minutes per model: id -> {times: [ms], values: [tok/s]}.
+    // Collected by this GUI from the status updates, so it starts empty.
+    Q_PROPERTY(QVariantMap throughputHistory READ throughputHistory NOTIFY throughputHistoryChanged)
     // Watchdog restart history of the selected model, newest last.
     Q_PROPERTY(QVariantList restartHistory READ restartHistory NOTIFY restartHistoryChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -46,6 +49,7 @@ public:
     QVariantMap metrics() const { return latestMetrics; }
     QVariantList metricsHistory() const { return history5m; }
     int metricsInterval() const { return interval; }
+    QVariantMap throughputHistory() const;
     QVariantList restartHistory() const { return history; }
     QString error() const { return lastError; }
     bool busy() const { return !pending.isEmpty(); }
@@ -77,6 +81,7 @@ signals:
     void profileCreated(const QString& profileId);
     void metricsChanged();
     void metricsIntervalChanged();
+    void throughputHistoryChanged();
     void restartHistoryChanged();
     void errorChanged();
     void busyChanged();
@@ -89,6 +94,9 @@ private:
         QString command, profileId;
         qint64 time = 0;
     };
+    struct Series {
+        QVariantList times, values;
+    };
     struct Log {
         QVector<LogModel::Line> lines;
         qint64 sequence = 0;
@@ -100,6 +108,7 @@ private:
     void appendLog(const QString& profileId, const QJsonObject& data, bool notify = true);
     void setError(const QString& error);
     void applyMetrics(const QJsonObject& sample);
+    void recordThroughput(const QString& profileId, const QJsonObject& throughput, qint64 now);
     void resetMetrics(const QJsonObject& data);
     void clearMetrics();
     void startAgentProcess();
@@ -117,6 +126,7 @@ private:
     LogModel console;
     QVariantMap latestMetrics;
     QVariantList history5m;
+    QHash<QString, Series> speed;
     int interval = 0;
     QVariantList history;
     QString selected, agentWarning, lastError;

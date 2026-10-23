@@ -60,6 +60,7 @@ Rectangle {
             text: ("%1:%2").arg(card.profile.host || "127.0.0.1").arg(card.profile.port || "—")
                 + (card.info.pid ? qsTr("  ·  PID %1").arg(card.info.pid) : "")
                 + (card.serverState === "RUNNING" ? qsTr("  ·  up %1").arg(Theme.duration(card.info.uptimeSeconds)) : "")
+                + ((card.info.throughput || {}).activeSlots > 0 ? qsTr("  ·  %1 tok/s").arg(Number(card.info.throughput.tokensPerSecond).toFixed(1)) : "")
             color: "#cbd5e1"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
         }
         UsageLabel { profileId: card.profileId; Layout.fillWidth: true }

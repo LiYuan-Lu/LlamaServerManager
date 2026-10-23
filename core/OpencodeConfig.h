@@ -20,8 +20,6 @@ public:
     static QJsonObject build(const Profile& profile, const QJsonObject& models, const QJsonObject& props, QString& error);
     // http://host:port/v1, with wildcard hosts mapped to loopback.
     static QUrl baseUrl(const Profile& profile);
-    // The value of --api-key in the extra arguments, if any.
-    static QString apiKey(const Profile& profile);
 signals:
     void finished(const QString& profileId, const QJsonObject& config, const QString& error);
 

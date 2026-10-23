@@ -2,6 +2,7 @@
 #include "HealthMonitor.h"
 #include "LlamaProcessManager.h"
 #include "RestartPolicy.h"
+#include "ThroughputMonitor.h"
 #include <QElapsedTimer>
 #include <QJsonArray>
 
@@ -55,6 +56,8 @@ private:
     qint64 ms(int seconds) const;
     LlamaProcessManager manager;
     HealthMonitor health;
+    // Generation speed from GET /slots while the process runs.
+    ThroughputMonitor throughput;
     RestartPolicy policy;
     QTimer retryTimer;
     QElapsedTimer processClock;

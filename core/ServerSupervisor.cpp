@@ -31,8 +31,10 @@ ServerSupervisor::~ServerSupervisor()
     // The manager's destructor kills the process; nothing may react to it any more.
     disconnect(&manager, nullptr, this, nullptr);
     disconnect(&health, nullptr, this, nullptr);
+    disconnect(&throughput, nullptr, this, nullptr);
     retryTimer.stop();
     health.stop();
+    throughput.stop();
 }
 void ServerSupervisor::configurePolicy()
 {
@@ -57,6 +59,7 @@ QString ServerSupervisor::start(const Profile& p)
     }
     retryTimer.stop();
     health.stop();
+    throughput.stop();
     ++generation;
     profile = p;
     configurePolicy();
@@ -75,6 +78,7 @@ QString ServerSupervisor::stop()
 {
     retryTimer.stop();
     health.stop();
+    throughput.stop();
     ++generation;
     policy.reset();
     attempt = 0;
@@ -104,6 +108,7 @@ QString ServerSupervisor::restart(const Profile& p)
     }
     retryTimer.stop();
     health.stop();
+    throughput.stop();
     ++generation;
     policy.reset();
     attempt = 0;
@@ -148,6 +153,7 @@ void ServerSupervisor::onManagerChanged()
         processClock.start();
         consecutiveFailures = 0;
         ++generation;
+        throughput.start(profile.host, profile.port, profile.apiKey(), int(ms(1)), int(ms(profile.watchdog.timeoutSeconds)));
         if (profile.watchdog.healthCheck) {
             healthSummary = "Waiting for /health";
             // Poll more often while loading so readiness is noticed quickly.
@@ -163,6 +169,7 @@ void ServerSupervisor::onManagerChanged()
         }
     } else if (state == "STOPPED" || state == "FAILED") {
         health.stop();
+        throughput.stop();
         ++generation;
         const bool wasRunning = processStarted;
         processStarted = false;
@@ -256,6 +263,7 @@ void ServerSupervisor::onHealth(quint64 gen, HealthMonitor::Outcome outcome, int
 void ServerSupervisor::fail(Failure kind, const QString& reason)
 {
     health.stop();
+    throughput.stop();
     ++generation;
     const QString label = kind == Failure::Crash ? "Process exited unexpectedly"
         : kind == Failure::Startup               ? "Startup failed"
@@ -394,6 +402,7 @@ QJsonObject ServerSupervisor::status() const
     s["restartAttempt"] = attempt;
     s["maxRestarts"] = w.maxRestarts;
     s["restartsInWindow"] = policy.recentRestarts(QDateTime::currentMSecsSinceEpoch());
+    s["throughput"] = throughput.status();
     s["nextRestartSeconds"] = retryTimer.isActive() ? int(std::ceil(retryTimer.remainingTime() / 1000.0)) : 0;
     return s;
 }
