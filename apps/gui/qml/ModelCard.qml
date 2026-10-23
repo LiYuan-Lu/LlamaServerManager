@@ -74,7 +74,7 @@ Rectangle {
         }
         UsageLabel { profileId: card.profileId; Layout.fillWidth: true }
         RowLayout {
-            visible: card.info.pid > 0
+            visible: card.info.pid > 0 && (card.serverState === "RUNNING" || card.serverState === "UNHEALTHY")
             Layout.fillWidth: true; spacing: 6
             Label {
                 text: card.speedText
