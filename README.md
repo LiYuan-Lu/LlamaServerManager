@@ -2,7 +2,7 @@
 
 **A Windows desktop app for running and supervising local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` instances.**
 
-Point it at your own `llama-server.exe` and GGUF models, then start, stop, and monitor any number of models from one window. A background Agent keeps them running when the window is closed, restarts crashed or unresponsive servers, and shows CPU, RAM, GPU, and VRAM usage live.
+Point it at your own `llama-server.exe` and GGUF models, then start, stop, and monitor any number of models from one window. A background Agent keeps them running when the window is closed, restarts crashed or unresponsive servers, and shows CPU, RAM, GPU, and VRAM usage and each model's generation speed live. Give a model a stable ID and it hands you a ready-made [opencode](https://opencode.ai) config for it.
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-0078D6)
 ![Qt](https://img.shields.io/badge/Qt-6.5%2B-41CD52)
@@ -10,27 +10,29 @@ Point it at your own `llama-server.exe` and GGUF models, then start, stop, and m
 ![CMake](https://img.shields.io/badge/CMake-3.24%2B-064F8C)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-![Llama Server Manager dashboard with five models and live CPU, RAM, GPU, and VRAM charts](docs/images/dashboard.png)
+![Llama Server Manager dashboard with five models, their generation speed, and live CPU, RAM, GPU, and VRAM charts](docs/images/dashboard.png)
 
 ## Features
 
-- **Many models, one window** — every model is a card with its state, address, PID, uptime, and one-click Start/Stop and Restart. Each model has its own profile: executable, GGUF file, context size, GPU layers, threads, parallel slots, extra arguments, and environment variables.
+- **Many models, one window** — every model is a card with its state, address, PID, uptime, generation speed, and one-click Start/Stop and Restart. Each model has its own profile: executable, GGUF file, context size, GPU layers, threads, parallel slots, extra arguments, and environment variables.
 - **Keeps running without the GUI** — models are owned by a separate Agent process. Close the window (or let it crash) and your servers keep serving; reopen it and everything reconnects.
 - **Watchdog** — HTTP health checks on `/health`, crash detection, and automatic restarts with exponential backoff and a restart limit, so a broken model does not restart forever. A manual Stop is always respected. Every failure is kept in a restart history.
 - **Live resource dashboard** — system CPU and RAM plus NVIDIA GPU utilization, VRAM, temperature, and power, each with a 5-minute chart. Every model card also shows that server's own CPU, RAM, and VRAM.
 - **Console** — live stdout/stderr per model with search, Error/Warning/Info filters, pause, copy, and export. Logs are also written to disk with size limits and rotation.
 - **Lives in the system tray** — closing the window keeps everything running in the tray, with a status dot, per-model Start/Stop/Restart, and a notification when a model fails. Optionally start at sign-in, with your chosen models loading automatically.
-- **Generation speed** — tokens per second for each model, read from llama-server's `/slots` once per second, with a 5-minute chart on the model page.
-- **Ready for opencode** — give a model a stable `--alias` ID, then let the model page read `/v1/models` and `/props` and produce an `opencode.json` provider entry to copy.
+- **Generation speed** — tokens per second for each model, read from llama-server's `/slots` once per second: live on every card, with the last request's average and a 5-minute chart on the model page.
+- **Ready for opencode** — tick **Alias** to give a model a stable API model ID (`--alias`) instead of its file path. While it runs, **opencode config** reads `/v1/models` and `/props` and shows an `opencode.json` provider entry with the right ID, context size, and API key, ready to copy.
 - **Convenience** — duplicate a profile to try other settings, and stop all models and the Agent with one Stop Agent button.
 - **English and Traditional Chinese** user interface, switchable at any time.
 - **Nothing extra to install** — no Docker, Python, Ollama, or LM Studio. It uses the llama.cpp build and models you already have and never modifies them.
 
 ## Screenshots
 
-| Console with level filters | 繁體中文介面 |
+| Console with level filters | Generation speed |
 | --- | --- |
-| ![A model's console with search, error/warning/info filters, and llama-server output](docs/images/console.png) | ![The dashboard in Traditional Chinese](docs/images/dashboard-zh-TW.png) |
+| ![A model's console with search, error/warning/info filters, and llama-server output](docs/images/console.png) | ![A model's Speed tab with the current tokens per second and a 5-minute chart](docs/images/speed.png) |
+| **opencode config** | **繁體中文介面** |
+| ![The opencode config dialog with a provider entry for the model's alias](docs/images/opencode.png) | ![The dashboard in Traditional Chinese](docs/images/dashboard-zh-TW.png) |
 
 The screenshots use sample data produced by the test doubles in [`tests/`](tests) (a stand-in server and NVML library), not a real GPU.
 
@@ -62,11 +64,11 @@ The releases are not code-signed yet, so the first time you run them Windows Sma
 ## Getting started
 
 1. Run the installer, or `llama-manager.exe` from a build. It starts the Agent in the background.
-2. Click the **+** card, give the model a name, and use **Browse…** to select your `llama-server.exe` and `.gguf` file. Adjust the port, context size, GPU layers, and other options, then click **Add model**.
+2. Click the **+** card, give the model a name, and use **Browse…** to select your `llama-server.exe` and `.gguf` file. Tick **Alias** if clients should call the model by a fixed ID (it starts as the name). Adjust the port, context size, GPU layers, and other options, then click **Add model**.
 3. Click **▶ Start** on the card. The Agent checks the executable's `--help` output, launches it, and keeps the model in `STARTING` until `GET /health` answers 200, then shows `RUNNING`.
-4. Point your client at `http://127.0.0.1:<port>` (llama-server's OpenAI-compatible API).
+4. Point your client at `http://127.0.0.1:<port>/v1` (llama-server's OpenAI-compatible API). For opencode, open the model's page and click **opencode config**.
 
-Click a card to open its page with the full profile, the **Console**, and the **Restart history**.
+Click a card to open its page with the full profile, the **Console**, the **Restart history**, and the **Speed** chart.
 
 ### Everyday use
 
@@ -79,10 +81,14 @@ Click a card to open its page with the full profile, the **Console**, and the **
 | Stop all models and the Agent | **Stop Agent** (top right), then confirm. Start it again with **Start Agent**. |
 | Start a model whenever the Agent starts | Check **Start automatically when the Agent starts** in its profile. |
 | Try different settings | **Duplicate** on the model page creates an unsaved copy on the next free port. |
+| Keep the API model ID when files move | Tick **Alias** in the profile. Without it, llama-server reports the model file path as the ID. |
+| Use a model in opencode | Start it, click **opencode config** on its page, then **Copy** and paste into `opencode.json` (add the provider to an existing `"provider"` section). |
+| See how fast a model generates | The speed line on its card, or the **Speed** tab on its page. |
+| Update the app | Install the new version. If the main page then says the running Agent is from an older version, click **Restart Agent**. |
 | Change how often resources refresh | **Refresh every** (1–10 s) above the resource tiles. |
 | Switch language | The **EN / 中文** button. |
 
-Extra arguments are entered as a JSON array (`["--flash-attn", "on"]`) and environment variables as a JSON object (`{"CUDA_VISIBLE_DEVICES": "0"}`). Options the manager sets itself (`-m`, `-c`, `-ngl`, `-t`, `--host`, `--port`, `--parallel`, `--metrics`) cannot be overridden there.
+Extra arguments are entered as a JSON array (`["--flash-attn", "on"]`) and environment variables as a JSON object (`{"CUDA_VISIBLE_DEVICES": "0"}`). Options the manager sets itself (`-m`, `-c`, `-ngl`, `-t`, `--host`, `--port`, `--parallel`, `--metrics`, `--alias`) cannot be overridden there. Profiles saved by 0.1.0 that pass `--alias` as an extra argument are moved to the **Alias** option automatically.
 
 ### Watchdog defaults
 
@@ -108,6 +114,8 @@ Deleting a model deletes its log folder; the model file itself is never touched.
 - The Agent refuses to start a model on a port another running model uses, but it does not check whether there is enough VRAM for all of them.
 - The Agent's named pipe is limited to the current Windows user. It is not a security boundary against other programs running as that user.
 - Log levels in the console are inferred from the text, since llama.cpp does not label its output.
+- Generation speed comes from llama-server's `/slots` endpoint, which is on by default; a model started with `--no-slots` shows the speed as off. It counts generated tokens across all slots, not prompt processing. The 5-minute speed chart is collected by the window, so it starts empty when the window opens.
+- With `--api-key` in the extra arguments, the opencode config includes that key. Keep it in mind before sharing the file.
 
 ## Building from source
 
@@ -182,11 +190,13 @@ docs/           Design and test documentation
 
 ## Roadmap
 
-Done: GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, and desktop integration (Phase 4): system tray, start at sign-in, and the Windows installer.
+Done:
+
+- **0.1.0** — GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, desktop integration (Phase 4: system tray, start at sign-in, Windows installer), and prebuilt releases built by CI.
+- **0.2.0** — model alias, opencode config, generation speed on the cards and model page, and a prompt to restart an Agent left running from an older version.
 
 Next:
 
-- Prebuilt releases on GitHub, built by CI
 - Signed release builds
 - macOS app bundle and DMG, Linux packages (the tray and start-at-sign-in code already has macOS and Linux backends)
 
