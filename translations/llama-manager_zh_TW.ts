@@ -277,29 +277,49 @@
         <translation>隨 Agent 啟動</translation>
     </message>
     <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="45"/>
+        <source>Speed off</source>
+        <translation>速度已關閉</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="45"/>
+        <source>Speed —</source>
+        <translation>速度 —</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="46"/>
+        <source>%1 tok/s</source>
+        <translation>%1 tok/s</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="46"/>
+        <source>Idle</source>
+        <translation>閒置</translation>
+    </message>
+    <message>
         <location filename="../apps/gui/qml/ModelCard.qml" line="49"/>
+        <source>last %1 tok/s</source>
+        <translation>上次 %1 tok/s</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="59"/>
         <source>Untitled model</source>
         <translation>未命名模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelCard.qml" line="56"/>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="66"/>
         <source>No model file selected</source>
         <translation>尚未選擇模型檔案</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelCard.qml" line="61"/>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="71"/>
         <source>  ·  PID %1</source>
         <translation>  ·  PID %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelCard.qml" line="62"/>
+        <location filename="../apps/gui/qml/ModelCard.qml" line="72"/>
         <source>  ·  up %1</source>
         <translation>  ·  已執行 %1</translation>
-    </message>
-    <message>
-        <location filename="../apps/gui/qml/ModelCard.qml" line="63"/>
-        <source>  ·  %1 tok/s</source>
-        <translation>  ·  %1 tok/s</translation>
     </message>
     <message>
         <location filename="../apps/gui/qml/ModelCard.qml" line="31"/>

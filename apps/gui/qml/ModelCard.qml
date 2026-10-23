@@ -19,7 +19,7 @@ Rectangle {
         if (health.indexOf("Waiting for /health") === 0) return qsTr("Waiting for /health")
         return health
     }
-    implicitHeight: 196
+    implicitHeight: 216
     radius: 10
     color: hover.hovered ? "#243244" : "#1f2937"
     border.color: serverState === "RUNNING" ? "#065f46" : serverState === "FAILED" ? "#7f1d1d"
@@ -37,6 +37,16 @@ Rectangle {
         return text
     }
     border.width: 1
+    // Generation speed from the Agent's /slots sampling; shown while the process runs.
+    readonly property var throughput: info.throughput || ({})
+    readonly property bool generating: throughput.available === true && throughput.activeSlots > 0
+    readonly property string speedText: {
+        if (throughput.available !== true)
+            return (throughput.reason || "").indexOf("disabled") >= 0 ? qsTr("Speed off") : qsTr("Speed —")
+        return generating ? qsTr("%1 tok/s").arg(Number(throughput.tokensPerSecond).toFixed(1)) : qsTr("Idle")
+    }
+    readonly property string speedDetail: throughput.available === true && throughput.lastTokensPerSecond > 0
+        ? qsTr("last %1 tok/s").arg(Number(throughput.lastTokensPerSecond).toFixed(1)) : ""
 
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
     TapHandler { onTapped: card.open() }
@@ -60,10 +70,24 @@ Rectangle {
             text: ("%1:%2").arg(card.profile.host || "127.0.0.1").arg(card.profile.port || "—")
                 + (card.info.pid ? qsTr("  ·  PID %1").arg(card.info.pid) : "")
                 + (card.serverState === "RUNNING" ? qsTr("  ·  up %1").arg(Theme.duration(card.info.uptimeSeconds)) : "")
-                + ((card.info.throughput || {}).activeSlots > 0 ? qsTr("  ·  %1 tok/s").arg(Number(card.info.throughput.tokensPerSecond).toFixed(1)) : "")
             color: "#cbd5e1"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
         }
         UsageLabel { profileId: card.profileId; Layout.fillWidth: true }
+        RowLayout {
+            visible: card.info.pid > 0
+            Layout.fillWidth: true; spacing: 6
+            Label {
+                text: card.speedText
+                color: card.generating ? "#c4b5fd" : "#94a3b8"
+                font.pixelSize: 13; font.bold: card.generating
+            }
+            Label {
+                text: card.speedDetail
+                visible: text.length > 0
+                color: "#94a3b8"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true
+            }
+            Item { Layout.fillWidth: true; visible: card.speedDetail.length === 0 }
+        }
         Label {
             text: card.watchdogText
             visible: text.length > 0
