@@ -5,6 +5,7 @@
 #include "core/LogStore.h"
 #include "core/LoginStartup.h"
 #include "core/MetricsCollector.h"
+#include "core/OpencodeConfig.h"
 #include "core/ProfileStore.h"
 #include "core/RestartPolicy.h"
 #include "core/ServerSupervisor.h"
@@ -590,6 +591,87 @@ private slots:
         o.remove("watchdog");
         QVERIFY(Profile::fromJson(o, p, error));
         QVERIFY(p.watchdog.autoRestart); // older files get defaults
+    }
+    void opencodeConfigBuild()
+    {
+        Profile p;
+        p.name = "Qwen3 8B";
+        p.host = "0.0.0.0";
+        p.port = 8081;
+        p.context = 16384;
+        p.parallel = 2;
+        QString error;
+        QVERIFY(OpencodeConfig::build(p, {}, {}, error).isEmpty());
+        QVERIFY(!error.isEmpty());
+        error.clear();
+        const QJsonObject models { { "data", QJsonArray { QJsonObject { { "id", "qwen3-8b" } } } } };
+        // Without /props, the context is split between the parallel slots.
+        auto config = OpencodeConfig::build(p, models, {}, error);
+        QVERIFY(error.isEmpty());
+        QCOMPARE(config["$schema"].toString(), QString("https://opencode.ai/config.json"));
+        const auto provider = config["provider"].toObject()["llamacpp-8081"].toObject();
+        QCOMPARE(provider["npm"].toString(), QString("@ai-sdk/openai-compatible"));
+        QCOMPARE(provider["name"].toString(), QString("Qwen3 8B"));
+        QCOMPARE(provider["options"].toObject()["baseURL"].toString(), QString("http://127.0.0.1:8081/v1"));
+        QVERIFY(!provider["options"].toObject().contains("apiKey"));
+        auto model = provider["models"].toObject()["qwen3-8b"].toObject();
+        QCOMPARE(model["name"].toString(), QString("Qwen3 8B"));
+        QCOMPARE(model["limit"].toObject()["context"].toInt(), 8192);
+        QCOMPARE(model["limit"].toObject()["output"].toInt(), 4096);
+        // /props wins, and the output reservation is capped.
+        config = OpencodeConfig::build(p, models, { { "default_generation_settings", QJsonObject { { "n_ctx", 65536 } } } }, error);
+        model = config["provider"].toObject()["llamacpp-8081"].toObject()["models"].toObject()["qwen3-8b"].toObject();
+        QCOMPARE(model["limit"].toObject()["context"].toInt(), 65536);
+        QCOMPARE(model["limit"].toObject()["output"].toInt(), 8192);
+        // Several IDs keep the name apart; an API key from the extra arguments is passed on.
+        p.extraArguments = { "--api-key", "secret,other" };
+        config = OpencodeConfig::build(p, { { "data", QJsonArray { QJsonObject { { "id", "a" } }, QJsonObject { { "id", "b" } } } } }, {}, error);
+        const auto entries = config["provider"].toObject()["llamacpp-8081"].toObject()["models"].toObject();
+        QCOMPARE(entries["b"].toObject()["name"].toString(), QString("Qwen3 8B (b)"));
+        QCOMPARE(config["provider"].toObject()["llamacpp-8081"].toObject()["options"].toObject()["apiKey"].toString(), QString("secret"));
+        p.extraArguments = { "--api-key=k2" };
+        QCOMPARE(OpencodeConfig::apiKey(p), QString("k2"));
+    }
+    void opencodeConfigFetch()
+    {
+        QTemporaryDir dir(QDir::currentPath() + "/lsm-test-XXXXXX");
+        auto p = profile(dir.path());
+        p.name = "Fake model";
+        p.aliasEnabled = true;
+        p.alias = "fake-alias";
+        p.context = 8192;
+        p.parallel = 4;
+        QProcess server;
+        server.start(p.executable, p.arguments());
+        QVERIFY(server.waitForStarted(5000));
+        struct Kill {
+            QProcess& process;
+            ~Kill()
+            {
+                process.kill();
+                process.waitForFinished(3000);
+            }
+        } kill { server };
+        QByteArray output;
+        QTRY_VERIFY_WITH_TIMEOUT((output += server.readAllStandardOutput()).contains("args=") || server.state() != QProcess::Running, 5000);
+        QVERIFY2(server.state() == QProcess::Running, output.constData());
+        OpencodeConfig fetcher;
+        QSignalSpy spy(&fetcher, &OpencodeConfig::finished);
+        fetcher.fetch(p);
+        QVERIFY(spy.wait(5000));
+        QVERIFY2(spy[0][2].toString().isEmpty(), qPrintable(spy[0][2].toString()));
+        const auto models = spy[0][1].toJsonObject()["provider"].toObject()[QString("llamacpp-%1").arg(p.port)].toObject()["models"].toObject();
+        QCOMPARE(models.keys(), QStringList { "fake-alias" });
+        QCOMPARE(models["fake-alias"].toObject()["limit"].toObject()["context"].toInt(), 2048);
+        // A stopped server reports an error instead of a config.
+        server.kill();
+        server.waitForFinished(3000);
+        OpencodeConfig offline;
+        QSignalSpy offlineSpy(&offline, &OpencodeConfig::finished);
+        offline.fetch(p, 2000);
+        QVERIFY(offlineSpy.wait(5000));
+        QVERIFY(!offlineSpy[0][2].toString().isEmpty());
+        QVERIFY(offlineSpy[0][1].toJsonObject().isEmpty());
     }
     void aliasOption()
     {

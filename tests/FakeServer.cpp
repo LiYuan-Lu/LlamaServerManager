@@ -5,6 +5,7 @@
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QRandomGenerator>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -23,6 +24,8 @@
 //   FAKE_DEMO_LOG             print a llama.cpp-like startup log and request lines instead of
 //                             the heartbeat (README screenshots)
 //   FAKE_RSS_MB               allocate and touch this many MiB so the process has a realistic size
+// GET /v1/models reports --alias (or the -m path) as the model ID; GET /props reports the
+// per-slot context (-c divided by --parallel).
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
@@ -54,10 +57,21 @@ int main(int argc, char** argv)
     if (index < 0 || !listener.listen(QHostAddress::LocalHost, args.value(index + 1).toUShort())) {
         return 2;
     }
+    const auto option = [&args](const QString& name, const QString& fallback) {
+        const int i = args.indexOf(name);
+        return i >= 0 ? args.value(i + 1) : fallback;
+    };
+    const QString modelId = option("--alias", option("-m", "model.gguf"));
+    const int slotContext = option("-c", "4096").toInt() / std::max(1, option("--parallel", "1").toInt());
+    const QByteArray modelsBody = QJsonDocument(QJsonObject { { "object", "list" },
+                                                    { "data", QJsonArray { QJsonObject { { "id", modelId }, { "object", "model" }, { "owned_by", "llamacpp" } } } } })
+                                      .toJson(QJsonDocument::Compact);
+    const QByteArray propsBody = QJsonDocument(QJsonObject { { "default_generation_settings", QJsonObject { { "n_ctx", slotContext } } } })
+                                     .toJson(QJsonDocument::Compact);
     QObject::connect(&listener, &QTcpServer::newConnection, &app, [&] {
         while (QTcpSocket* socket = listener.nextPendingConnection()) {
             QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
-            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &started, loadingMs, hangAfterMs] {
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket, &started, loadingMs, hangAfterMs, &modelsBody, &propsBody] {
                 const auto request = socket->property("buffer").toByteArray() + socket->readAll();
                 if (!request.contains("\r\n\r\n")) {
                     socket->setProperty("buffer", request);
@@ -69,7 +83,11 @@ int main(int argc, char** argv)
                     return; // simulate a stuck server
                 }
                 QByteArray status = "200 OK", body = R"({"status":"ok"})";
-                if (!request.startsWith("GET /health ")) {
+                if (request.startsWith("GET /v1/models ")) {
+                    body = modelsBody;
+                } else if (request.startsWith("GET /props ")) {
+                    body = propsBody;
+                } else if (!request.startsWith("GET /health ")) {
                     status = "404 Not Found";
                     body = "{}";
                 } else if (elapsed < loadingMs) {

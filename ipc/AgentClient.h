@@ -65,7 +65,9 @@ public:
     Q_INVOKABLE void shutdownAgent();
     // Starts the Agent again after shutdownAgent().
     Q_INVOKABLE void launchAgent();
-    Q_INVOKABLE void clearError() { setError({ }); }
+    Q_INVOKABLE void clearError() { setError({}); }
+    // Reads /v1/models and /props from the running model and emits opencodeConfigReady().
+    Q_INVOKABLE void requestOpencodeConfig(const QString& profileId);
 signals:
     void connectedChanged();
     void instancesChanged();
@@ -79,6 +81,8 @@ signals:
     void errorChanged();
     void busyChanged();
     void agentStoppedChanged();
+    // `config` is indented JSON for opencode.json; empty when `error` is set.
+    void opencodeConfigReady(const QString& profileId, const QString& config, const QString& error);
 
 private:
     struct Pending {

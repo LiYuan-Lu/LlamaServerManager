@@ -1,9 +1,11 @@
 #include "AgentClient.h"
 #include "Protocol.h"
 #include "core/MetricsCollector.h"
+#include "core/OpencodeConfig.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QProcess>
 #include <QUrl>
 #include <QUuid>
@@ -150,6 +152,27 @@ void AgentClient::deleteProfile(const QString& id)
     send("deleteProfile", { { "profileId", id } });
 }
 QString AgentClient::localPath(const QUrl& url) const { return url.toLocalFile(); }
+void AgentClient::requestOpencodeConfig(const QString& profileId)
+{
+    Profile profile;
+    QString error;
+    if (!profiles.contains(profileId)) {
+        emit opencodeConfigReady(profileId, {}, "Unknown model");
+        return;
+    }
+    if (!Profile::fromJson(QJsonObject::fromVariantMap(profiles.value(profileId)), profile, error)) {
+        emit opencodeConfigReady(profileId, {}, error);
+        return;
+    }
+    // The GUI talks to the local server directly; the Agent is not involved.
+    auto* fetcher = new OpencodeConfig(this);
+    connect(fetcher, &OpencodeConfig::finished, this, [this, fetcher](const QString& id, const QJsonObject& config, const QString& message) {
+        fetcher->deleteLater();
+        const auto text = message.isEmpty() ? QString::fromUtf8(QJsonDocument(config).toJson(QJsonDocument::Indented)) : QString();
+        emit opencodeConfigReady(id, text, message);
+    });
+    fetcher->fetch(profile);
+}
 void AgentClient::clearLogs()
 {
     if (logs.contains(selected)) {

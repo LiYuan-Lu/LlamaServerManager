@@ -98,6 +98,70 @@ Item {
         onRejected: page.pendingLeave = null
     }
 
+    // Shows an opencode provider config built from the running server's /v1/models and /props.
+    Dialog {
+        id: opencodeDialog
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("opencode config")
+        width: Math.min(page.width - 40, 680)
+        property bool loading: false
+        property bool copied: false
+        property string config: ""
+        property string error: ""
+        function request() {
+            config = ""; error = ""; copied = false; loading = true
+            open()
+            agent.requestOpencodeConfig(page.profileId)
+        }
+        Connections {
+            target: agent
+            function onOpencodeConfigReady(id, config, error) {
+                if (id !== page.profileId) return
+                opencodeDialog.loading = false
+                opencodeDialog.config = config
+                opencodeDialog.error = error
+            }
+        }
+        ColumnLayout {
+            width: opencodeDialog.availableWidth; spacing: 8
+            Label {
+                text: qsTr("Paste into opencode.json. If the file already has a \"provider\" section, add this provider to it.")
+                color: "#94a3b8"; wrapMode: Text.Wrap; Layout.fillWidth: true
+            }
+            Label { visible: opencodeDialog.loading; text: qsTr("Reading /v1/models and /props…") }
+            Label {
+                visible: opencodeDialog.error.length > 0
+                text: opencodeDialog.error; color: "#fca5a5"; wrapMode: Text.Wrap; Layout.fillWidth: true
+            }
+            ScrollView {
+                visible: opencodeDialog.config.length > 0
+                Layout.fillWidth: true; Layout.preferredHeight: 340
+                TextArea {
+                    id: opencodeText
+                    text: opencodeDialog.config
+                    readOnly: true; selectByMouse: true; wrapMode: TextEdit.NoWrap
+                    font.family: "Consolas"; font.pixelSize: 12
+                }
+            }
+        }
+        footer: DialogButtonBox {
+            Button {
+                text: opencodeDialog.copied ? qsTr("Copied") : qsTr("Copy")
+                enabled: opencodeDialog.config.length > 0
+                DialogButtonBox.buttonRole: DialogButtonBox.ActionRole
+                onClicked: {
+                    opencodeText.selectAll(); opencodeText.copy(); opencodeText.deselect()
+                    opencodeDialog.copied = true
+                }
+            }
+            Button {
+                text: qsTr("Close")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+    }
+
     Dialog {
         id: confirmDelete
         anchors.centerIn: parent
@@ -118,6 +182,13 @@ Item {
                 font.pixelSize: 20; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true
             }
             StateBadge { visible: !page.isNew; serverState: page.serverState }
+            Button {
+                visible: !page.isNew
+                text: qsTr("opencode config")
+                enabled: page.serverState === "RUNNING"
+                ToolTip.visible: hovered; ToolTip.text: qsTr("Read the model ID from /v1/models and show a config for opencode")
+                onClicked: opencodeDialog.request()
+            }
             Button {
                 visible: !page.isNew
                 text: qsTr("Duplicate")

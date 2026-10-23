@@ -10,7 +10,8 @@ if(MSVC)
 endif()
 add_library(lsm_core STATIC core/Profile.cpp core/ProfileStore.cpp core/LogStore.cpp core/LlamaProcessManager.cpp
   core/RestartPolicy.cpp core/HealthMonitor.cpp core/ServerSupervisor.cpp
-  core/SystemMonitor.cpp core/GpuMonitor.cpp core/MetricsCollector.cpp core/AppSettings.cpp core/LoginStartup.cpp)
+  core/SystemMonitor.cpp core/GpuMonitor.cpp core/MetricsCollector.cpp core/AppSettings.cpp core/LoginStartup.cpp
+  core/OpencodeConfig.cpp)
 target_include_directories(lsm_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(lsm_core PUBLIC Qt6::Core Qt6::Network)
 add_library(lsm_ipc STATIC ipc/Protocol.cpp ipc/AgentServer.cpp ipc/AgentClient.cpp ipc/LogModel.cpp)
@@ -71,7 +72,7 @@ if(BUILD_TESTING)
   target_compile_definitions(lsm-tests PRIVATE LSM_FAKE_NVML="$<TARGET_FILE:fake-nvml>")
   add_dependencies(lsm-tests fake-llama-server fake-nvml llama-manager-agent llama-manager)
   foreach(case restartPolicy healthMonitor systemMonitor gpuMonitor metricsCollector agentMetricsAndSettings logModel autoStartAndShutdown loginStartup guiSingleInstanceAndQuit watchdogStartupGrace watchdogCrashRecovery watchdogHealthRestart watchdogLimitsAndManualStop protocolFraming persistenceAndValidation boundedLogs processLifecycle failuresAndCancellation agentAndGuiReconnect guiDetachedAgent
-    aliasOption)
+    aliasOption opencodeConfigBuild opencodeConfigFetch)
     add_test(NAME ${case} COMMAND lsm-tests ${case} -o ${case}-results.txt,txt -o -,txt)
     set_tests_properties(${case} PROPERTIES TIMEOUT 180)
     if(WIN32)

@@ -328,87 +328,92 @@
 <context>
     <name>ModelPage</name>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="105"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
         <source>Delete model</source>
         <translation>刪除模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="107"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="171"/>
         <source>Delete &quot;%1&quot;? Its profile and logs will be removed. The model file itself is not touched.</source>
         <translation>要刪除「%1」嗎？其設定檔與日誌會被移除，模型檔案本身不受影響。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="115"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="179"/>
         <source>← All models</source>
         <translation>← 所有模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="117"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="181"/>
         <source>New model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="117"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="181"/>
         <source>New model (copy)</source>
         <translation>新增模型（複本）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="123"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="189"/>
+        <source>Read the model ID from /v1/models and show a config for opencode</source>
+        <translation>從 /v1/models 讀取模型 ID，並產生 opencode 設定</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="194"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="125"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="196"/>
         <source>Create a new model with a copy of these settings</source>
         <translation>用這些設定的複本建立新模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="130"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
         <source>Delete</source>
         <translation>刪除</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="140"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="211"/>
         <source>PID  %1</source>
         <translation>PID  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="141"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="212"/>
         <source>Port  %1</source>
         <translation>Port  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="142"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="213"/>
         <source>Uptime  %1</source>
         <translation>執行時間  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="143"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="214"/>
         <source>Health  %1</source>
         <translation>健康狀態  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="145"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="216"/>
         <source>Restarts  %1/%2</source>
         <translation>重啟次數  %1/%2</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="146"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="217"/>
         <source>Automatic restarts within the restart window</source>
         <translation>重啟時間窗內的自動重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="158"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="229"/>
         <source>With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.</source>
         <translation>啟用健康檢查時，模型會維持 STARTING，直到 GET /health 回傳 200 才變成 RUNNING。健康檢查失敗、程序當掉或啟動失敗時，會以遞增的等待時間自動重啟；按下停止一定會取消自動重啟。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="201"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="272"/>
         <source>Console</source>
         <translation>主控台</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="202"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
         <source>Restart history (%1)</source>
         <translation>重啟紀錄（%1）</translation>
     </message>
@@ -438,32 +443,63 @@
         <translation>等待 /health 回應</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="106"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="187"/>
+        <source>opencode config</source>
+        <translation>opencode 設定</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="129"/>
+        <source>Paste into opencode.json. If the file already has a &quot;provider&quot; section, add this provider to it.</source>
+        <translation>貼到 opencode.json。如果檔案裡已經有「provider」區段，請把這個 provider 加進去。</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="132"/>
+        <source>Reading /v1/models and /props…</source>
+        <translation>正在讀取 /v1/models 和 /props…</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="150"/>
+        <source>Copied</source>
+        <translation>已複製</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="150"/>
+        <source>Copy</source>
+        <translation>複製</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="159"/>
+        <source>Close</source>
+        <translation>關閉</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="240"/>
         <source>Add model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="169"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="240"/>
         <source>Save profile</source>
         <translation>儲存設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="174"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="245"/>
         <source>Revert changes</source>
         <translation>還原編輯</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="176"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="247"/>
         <source>Fill in the paths, then add the model to the list</source>
         <translation>填好路徑後，將模型加入清單</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="177"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="248"/>
         <source>Unsaved changes; save before starting</source>
         <translation>尚未儲存；儲存後才能啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="177"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="248"/>
         <source>Starts with the saved profile</source>
         <translation>使用已儲存的設定啟動</translation>
     </message>
