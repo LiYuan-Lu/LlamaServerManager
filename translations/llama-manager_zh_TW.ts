@@ -381,87 +381,87 @@
         <translation>刪除模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="197"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="200"/>
         <source>Delete &quot;%1&quot;? Its profile and logs will be removed. The model file itself is not touched.</source>
         <translation>要刪除「%1」嗎？其設定檔與日誌會被移除，模型檔案本身不受影響。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="205"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="208"/>
         <source>← All models</source>
         <translation>← 所有模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="207"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="210"/>
         <source>New model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="207"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="210"/>
         <source>New model (copy)</source>
         <translation>新增模型（複本）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="217"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="220"/>
         <source>Read the model ID from /v1/models and show a config for opencode</source>
         <translation>從 /v1/models 讀取模型 ID，並產生 opencode 設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="222"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="225"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="224"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="227"/>
         <source>Create a new model with a copy of these settings</source>
         <translation>用這些設定的複本建立新模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="229"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="232"/>
         <source>Delete</source>
         <translation>刪除</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="239"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="242"/>
         <source>PID  %1</source>
         <translation>PID  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="240"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="243"/>
         <source>Port  %1</source>
         <translation>Port  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="241"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="244"/>
         <source>Uptime  %1</source>
         <translation>執行時間  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="242"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="245"/>
         <source>Health  %1</source>
         <translation>健康狀態  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="249"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="252"/>
         <source>Restarts  %1/%2</source>
         <translation>重啟次數  %1/%2</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="250"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="253"/>
         <source>Automatic restarts within the restart window</source>
         <translation>重啟時間窗內的自動重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="262"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="265"/>
         <source>With health checks on, the model stays STARTING until GET /health returns 200, then becomes RUNNING. Failed checks, crashes, and startup failures trigger automatic restarts with backoff; Stop always cancels them.</source>
         <translation>啟用健康檢查時，模型會維持 STARTING，直到 GET /health 回傳 200 才變成 RUNNING。健康檢查失敗、程序當掉或啟動失敗時，會以遞增的等待時間自動重啟；按下停止一定會取消自動重啟。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="305"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="308"/>
         <source>Console</source>
         <translation>主控台</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="306"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="309"/>
         <source>Restart history (%1)</source>
         <translation>重啟紀錄（%1）</translation>
     </message>
@@ -528,7 +528,7 @@
     </message>
     <message>
         <location filename="../apps/gui/qml/ModelPage.qml" line="132"/>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="213"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="216"/>
         <source>opencode config</source>
         <translation>opencode 設定</translation>
     </message>
@@ -558,57 +558,57 @@
         <translation>關閉</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="244"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="247"/>
         <source>Speed  %1</source>
         <translation>速度  %1</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="276"/>
         <source>Add model</source>
         <translation>新增模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="273"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="276"/>
         <source>Save profile</source>
         <translation>儲存設定</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="278"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="281"/>
         <source>Revert changes</source>
         <translation>還原編輯</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="280"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="283"/>
         <source>Fill in the paths, then add the model to the list</source>
         <translation>填好路徑後，將模型加入清單</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="281"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="284"/>
         <source>Unsaved changes; save before starting</source>
         <translation>尚未儲存；儲存後才能啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="281"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="284"/>
         <source>Starts with the saved profile</source>
         <translation>使用已儲存的設定啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="307"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="310"/>
         <source>Speed</source>
         <translation>速度</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="315"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="318"/>
         <source>Generation speed (tokens per second, all slots)</source>
         <translation>生成速度（每秒 token 數，所有處理槽合計）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="322"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="325"/>
         <source>No samples yet. The speed appears while the model runs.</source>
         <translation>尚無資料。模型運作時會顯示速度。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ModelPage.qml" line="322"/>
+        <location filename="../apps/gui/qml/ModelPage.qml" line="325"/>
         <source>Start the model to see its generation speed</source>
         <translation>啟動模型後即可查看生成速度</translation>
     </message>

@@ -194,7 +194,10 @@ Item {
         modal: true
         title: qsTr("Delete model")
         standardButtons: Dialog.Ok | Dialog.Cancel
-        Label { text: qsTr("Delete \"%1\"? Its profile and logs will be removed. The model file itself is not touched.").arg(page.info.name || ""); wrapMode: Text.Wrap; width: 360 }
+        // A fixed width: sized from its content, the dialog loops on implicitWidth when the
+        // language changes and the standard buttons are retranslated.
+        width: 460
+        Label { text: qsTr("Delete \"%1\"? Its profile and logs will be removed. The model file itself is not touched.").arg(page.info.name || ""); wrapMode: Text.Wrap; width: confirmDelete.availableWidth }
         onAccepted: agent.deleteProfile(page.profileId)
     }
 
