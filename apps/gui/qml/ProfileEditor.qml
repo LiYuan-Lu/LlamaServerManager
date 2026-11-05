@@ -30,7 +30,7 @@ ColumnLayout {
         threads.text = String(p.threads || 4); parallel.text = String(p.parallel || 1)
         metrics.checked = p.metrics || false
         autoStartBox.checked = p.autoStart === true
-        extra.text = JSON.stringify(p.extraArguments || []); env.text = JSON.stringify(p.environment || {})
+        argsToRows(p.extraArguments || []); env.text = JSON.stringify(p.environment || {})
         const w = p.watchdog || {}
         autoRestart.checked = w.autoRestart !== false; healthCheck.checked = w.healthCheck !== false
         wdInterval.text = String(w.intervalSeconds || 30); wdTimeout.text = String(w.timeoutSeconds || 5)
@@ -39,10 +39,37 @@ ColumnLayout {
         wdMax.text = String(w.maxRestarts === undefined ? 3 : w.maxRestarts); wdWindow.text = String(w.windowSeconds || 600)
         dirty = false; validationError = ""
     }
+    // A token after an option is its value unless it is another option; negative numbers are values.
+    function isOptionValue(token) {
+        return token !== undefined && token.length > 0 && (!token.startsWith("-") || /^-\d/.test(token))
+    }
+    // Groups the argument list into rows of an option and an optional value.
+    function argsToRows(args) {
+        argRows.clear()
+        for (let i = 0; i < args.length; ++i) {
+            const arg = String(args[i]), next = args[i + 1] === undefined ? undefined : String(args[i + 1])
+            if (arg.startsWith("-") && !arg.includes("=") && isOptionValue(next)) {
+                argRows.append({ option: arg, value: next }); ++i
+            } else {
+                argRows.append({ option: arg, value: "" })
+            }
+        }
+    }
+    function rowsToArgs() {
+        const args = []
+        for (let i = 0; i < argRows.count; ++i) {
+            const row = argRows.get(i), option = row.option.trim(), value = row.value.trim()
+            if (option.length === 0 && value.length === 0) continue
+            if (option.length === 0) throw new Error(qsTr("Each extra argument with a value needs an option"))
+            args.push(option)
+            if (value.length > 0) args.push(value)
+        }
+        return args
+    }
     function save() {
         try {
-            const args = JSON.parse(extra.text), variables = JSON.parse(env.text)
-            if (!Array.isArray(args) || typeof variables !== "object" || variables === null || Array.isArray(variables)) throw new Error(qsTr("Extra arguments must be a JSON array, and environment variables must be a JSON object"))
+            const args = rowsToArgs(), variables = JSON.parse(env.text)
+            if (typeof variables !== "object" || variables === null || Array.isArray(variables)) throw new Error(qsTr("Environment variables must be a JSON object"))
             const values = [port.text, context.text, gpu.text, threads.text, parallel.text].map(Number)
             const wd = [wdInterval.text, wdTimeout.text, wdThreshold.text, wdGrace.text, wdCooldown.text, wdBackoff.text, wdMax.text, wdWindow.text].map(Number)
             if (values.concat(wd).some(v => !Number.isInteger(v))) throw new Error(qsTr("Numeric fields must be integers"))
@@ -134,10 +161,46 @@ ColumnLayout {
         TextField { id: parallel; Layout.preferredWidth: 65; validator: IntValidator { bottom: 1 } onTextEdited: editor.dirty = true }
         CheckBox { id: metrics; text: "--metrics"; Layout.columnSpan: 4; onClicked: editor.dirty = true }
     }
+    ListModel { id: argRows }
+    ColumnLayout {
+        Layout.fillWidth: true; enabled: editor.editable; spacing: 4
+        Label { text: qsTr("Extra arguments") }
+        Repeater {
+            model: argRows
+            delegate: RowLayout {
+                required property int index
+                required property string option
+                required property string value
+                Layout.fillWidth: true
+                TextField {
+                    Layout.preferredWidth: 220; text: option; placeholderText: "--jinja"
+                    onTextEdited: { argRows.setProperty(index, "option", text); editor.dirty = true }
+                    // "--temp 1.0" typed into the option field is split into option and value.
+                    onEditingFinished: {
+                        const m = text.trim().match(/^(-\S+)\s+(.+)$/)
+                        if (m && value.trim().length === 0) {
+                            argRows.set(index, { option: m[1], value: m[2] }); editor.dirty = true
+                        }
+                    }
+                }
+                TextField {
+                    Layout.fillWidth: true; text: value; placeholderText: qsTr("Value (optional)")
+                    onTextEdited: { argRows.setProperty(index, "value", text); editor.dirty = true }
+                }
+                Button {
+                    text: "✕"; Layout.preferredWidth: implicitHeight
+                    onClicked: { argRows.remove(index); editor.dirty = true }
+                    ToolTip.visible: hovered; ToolTip.text: qsTr("Remove this argument")
+                }
+            }
+        }
+        Button {
+            text: qsTr("+ Add argument")
+            onClicked: { argRows.append({ option: "", value: "" }); editor.dirty = true }
+        }
+    }
     RowLayout {
         Layout.fillWidth: true; enabled: editor.editable
-        Label { text: qsTr("Extra arguments (JSON)") }
-        TextField { id: extra; Layout.fillWidth: true; placeholderText: '["--verbose"]'; onTextEdited: editor.dirty = true }
         Label { text: qsTr("Environment variables (JSON)") }
         TextField { id: env; Layout.fillWidth: true; placeholderText: '{"NAME":"value"}'; onTextEdited: editor.dirty = true }
     }

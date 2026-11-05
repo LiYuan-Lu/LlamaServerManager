@@ -88,7 +88,7 @@ Click a card to open its page with the full profile, the **Console**, the **Rest
 | Change how often resources refresh | **Refresh every** (1–10 s) above the resource tiles. |
 | Switch language | The **EN / 中文** button. |
 
-Extra arguments are entered as a JSON array (`["--flash-attn", "on"]`) and environment variables as a JSON object (`{"CUDA_VISIBLE_DEVICES": "0"}`). Options the manager sets itself (`-m`, `-c`, `-ngl`, `-t`, `--host`, `--port`, `--parallel`, `--metrics`, `--alias`) cannot be overridden there. Profiles saved by 0.1.0 that pass `--alias` as an extra argument are moved to the **Alias** option automatically.
+Extra arguments are entered one per row: click **+ Add argument**, type the option (`--jinja`), and add a value when it takes one (`--temp` and `1.0`). Typing `--temp 1.0` into the option field splits it into the two fields. Environment variables as a JSON object (`{"CUDA_VISIBLE_DEVICES": "0"}`). Options the manager sets itself (`-m`, `-c`, `-ngl`, `-t`, `--host`, `--port`, `--parallel`, `--metrics`, `--alias`) cannot be overridden there. Profiles saved by 0.1.0 that pass `--alias` as an extra argument are moved to the **Alias** option automatically.
 
 ### Watchdog defaults
 
