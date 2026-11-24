@@ -116,6 +116,13 @@ if (Test-Path $zip) { Remove-Item -Force $zip }
 Copy-Item -Recurse $stage $portable
 if ($vcRedist) {
     $crtDlls = Get-ChildItem (Join-Path (Split-Path $vcRedist) "x64\Microsoft.VC*.CRT\*.dll") -ErrorAction SilentlyContinue
+    if (-not $crtDlls) {
+        # Visual Studio 2026 keeps vc_redist.x64.exe in VC\Redist\MSVC\v145 and the DLLs in a
+        # sibling folder named after the toolset version (VC\Redist\MSVC\14.51.36231).
+        $crtDir = Get-ChildItem (Join-Path (Split-Path (Split-Path $vcRedist)) "*\x64\Microsoft.VC*.CRT") -Directory -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+        if ($crtDir) { $crtDlls = Get-ChildItem (Join-Path $crtDir.FullName "*.dll") }
+    }
     if ($crtDlls) {
         $crtDlls | Copy-Item -Destination (Join-Path $portable "bin")
         Write-Host "Added $($crtDlls.Count) Visual C++ runtime DLLs to the zip"
