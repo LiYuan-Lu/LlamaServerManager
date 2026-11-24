@@ -646,199 +646,204 @@
 <context>
     <name>ProfileEditor</name>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="75"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="76"/>
         <source>Numeric fields must be integers</source>
         <translation>數值欄位必須為整數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="77"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="78"/>
         <source>Enter an alias or turn the alias option off</source>
         <translation>請輸入別名，或取消勾選別名選項</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="78"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="79"/>
         <source>The running Agent is older than this app and would drop new settings. Restart the Agent from the main page first.</source>
         <translation>目前執行的 Agent 比這個程式舊，會遺失新的設定。請先在主畫面重新啟動 Agent。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="99"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="100"/>
         <source>Select llama-server.exe</source>
         <translation>選擇 llama-server.exe</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="100"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="101"/>
         <source>Select GGUF model</source>
         <translation>選擇 GGUF 模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="105"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="106"/>
         <source>Select working directory</source>
         <translation>選擇工作目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="118"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="119"/>
         <source>Alias</source>
         <translation>別名</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="124"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="125"/>
         <source>Pass --alias so /v1/models reports this ID instead of the model file path. Defaults to the name.</source>
         <translation>啟動時加上 --alias，讓 /v1/models 回報這個 ID，而不是模型檔案路徑。預設與名稱相同。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="129"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="130"/>
         <source>Model ID reported by /v1/models</source>
         <translation>/v1/models 回報的模型 ID</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="135"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="136"/>
         <source>The alias is empty. Enter an ID or turn the alias option off.</source>
         <translation>別名是空的。請輸入 ID，或取消勾選別名選項。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="139"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="140"/>
         <source>Select the executable</source>
         <translation>選擇執行檔</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="140"/>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="143"/>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="146"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="141"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="144"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="147"/>
         <source>Browse…</source>
         <translation>瀏覽…</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="141"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="142"/>
         <source>GGUF model</source>
         <translation>GGUF 模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="142"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="143"/>
         <source>Select the model file</source>
         <translation>選擇模型檔案</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="144"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="145"/>
         <source>Working directory</source>
         <translation>工作目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="145"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="146"/>
         <source>Leave empty to use the executable directory</source>
         <translation>留空使用執行檔目錄</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="204"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="160"/>
+        <source>Pass -ngl with this number of layers. Turn it off to let llama-server choose how many layers fit on the GPU.</source>
+        <translation>以這個層數傳入 -ngl。關閉後由 llama-server 自行決定要放多少層到 GPU。</translation>
+    </message>
+    <message>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="209"/>
         <source>Environment variables (JSON)</source>
         <translation>環境變數 (JSON)</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="210"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="215"/>
         <source>Start automatically when the Agent starts</source>
         <translation>Agent 啟動時自動啟動此模型</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="76"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="77"/>
         <source>Enter a name for this model</source>
         <translation>請輸入模型名稱</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="108"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="109"/>
         <source>Name</source>
         <translation>名稱</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="110"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="111"/>
         <source>Shown on the model card</source>
         <translation>顯示在模型卡片上</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="216"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="221"/>
         <source>Watchdog</source>
         <translation>Watchdog</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="213"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="218"/>
         <source>Each time the Agent starts, it starts this model too. Models stopped with Stop stay stopped until the next Agent start.</source>
         <translation>每次 Agent 啟動時，也會一併啟動此模型。用「停止」停下的模型會維持停止，直到下次 Agent 啟動。</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="63"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="64"/>
         <source>Each extra argument with a value needs an option</source>
         <translation>有值的額外參數必須填寫參數名稱</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="72"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="73"/>
         <source>Environment variables must be a JSON object</source>
         <translation>環境變數必須是 JSON 物件</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="167"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="172"/>
         <source>Extra arguments</source>
         <translation>額外參數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="187"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="192"/>
         <source>Value (optional)</source>
         <translation>值（選填）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="193"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="198"/>
         <source>Remove this argument</source>
         <translation>移除這個參數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="198"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="203"/>
         <source>+ Add argument</source>
         <translation>+ 新增參數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="221"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="226"/>
         <source>Restart automatically after crashes, startup failures, and failed health checks</source>
         <translation>程序當掉、啟動失敗或健康檢查失敗時自動重新啟動</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="224"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="229"/>
         <source>Check GET /health (STARTING lasts until it returns 200)</source>
         <translation>檢查 GET /health（回傳 200 前維持 STARTING）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="228"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="233"/>
         <source>Interval (s)</source>
         <translation>間隔（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="230"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="235"/>
         <source>Timeout (s)</source>
         <translation>逾時（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="232"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="237"/>
         <source>Failures before unhealthy</source>
         <translation>判定異常的連續失敗次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="234"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="239"/>
         <source>Startup grace (s)</source>
         <translation>載入寬限期（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="236"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="241"/>
         <source>Restart cooldown (s)</source>
         <translation>重啟冷卻（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="238"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="243"/>
         <source>Max backoff (s)</source>
         <translation>最長等待（秒）</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="240"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="245"/>
         <source>Max restarts</source>
         <translation>最多重啟次數</translation>
     </message>
     <message>
-        <location filename="../apps/gui/qml/ProfileEditor.qml" line="242"/>
+        <location filename="../apps/gui/qml/ProfileEditor.qml" line="247"/>
         <source>Within (s)</source>
         <translation>時間窗（秒）</translation>
     </message>

@@ -671,12 +671,12 @@ private slots:
         p.context = 16384;
         p.parallel = 2;
         QString error;
-        QVERIFY(OpencodeConfig::build(p, {}, {}, error).isEmpty());
+        QVERIFY(OpencodeConfig::build(p, { }, { }, error).isEmpty());
         QVERIFY(!error.isEmpty());
         error.clear();
         const QJsonObject models { { "data", QJsonArray { QJsonObject { { "id", "qwen3-8b" } } } } };
         // Without /props, the context is split between the parallel slots.
-        auto config = OpencodeConfig::build(p, models, {}, error);
+        auto config = OpencodeConfig::build(p, models, { }, error);
         QVERIFY(error.isEmpty());
         QCOMPARE(config["$schema"].toString(), QString("https://opencode.ai/config.json"));
         const auto provider = config["provider"].toObject()["llamacpp-8081"].toObject();
@@ -695,7 +695,7 @@ private slots:
         QCOMPARE(model["limit"].toObject()["output"].toInt(), 8192);
         // Several IDs keep the name apart; an API key from the extra arguments is passed on.
         p.extraArguments = { "--api-key", "secret,other" };
-        config = OpencodeConfig::build(p, { { "data", QJsonArray { QJsonObject { { "id", "a" } }, QJsonObject { { "id", "b" } } } } }, {}, error);
+        config = OpencodeConfig::build(p, { { "data", QJsonArray { QJsonObject { { "id", "a" } }, QJsonObject { { "id", "b" } } } } }, { }, error);
         const auto entries = config["provider"].toObject()["llamacpp-8081"].toObject()["models"].toObject();
         QCOMPARE(entries["b"].toObject()["name"].toString(), QString("Qwen3 8B (b)"));
         QCOMPARE(config["provider"].toObject()["llamacpp-8081"].toObject()["options"].toObject()["apiKey"].toString(), QString("secret"));
@@ -770,6 +770,25 @@ private slots:
         p.extraArguments = { "-a", "other" };
         QVERIFY(!p.validate(false).isEmpty());
         p.extraArguments = { "--alias=other" };
+        QVERIFY(!p.validate(false).isEmpty());
+    }
+    void gpuLayersOption()
+    {
+        // On by default: profiles saved before the option keep passing -ngl.
+        Profile p;
+        QString error;
+        QVERIFY(Profile::fromJson({ { "gpuLayers", 99 } }, p, error));
+        QVERIFY(p.gpuLayersEnabled);
+        auto args = p.arguments();
+        QCOMPARE(args.value(args.indexOf("-ngl") + 1), QString("99"));
+        QVERIFY(!Profile::fromJson({ { "gpuLayersEnabled", "no" } }, p, error));
+        // Off: -ngl is left out so llama-server chooses, and the number is kept for later.
+        QVERIFY(Profile::fromJson({ { "gpuLayersEnabled", false }, { "gpuLayers", 99 } }, p, error));
+        QVERIFY(!p.arguments().contains("-ngl"));
+        QVERIFY(!p.toJson()["gpuLayersEnabled"].toBool(true));
+        QCOMPARE(p.toJson()["gpuLayers"].toInt(), 99);
+        // Still a managed option: extra arguments cannot set it.
+        p.extraArguments = { "-ngl", "10" };
         QVERIFY(!p.validate(false).isEmpty());
     }
     void boundedLogs()
@@ -1238,6 +1257,14 @@ private slots:
         QCOMPARE(saved["name"].toString(), QString("Renamed"));
         QVERIFY(saved["aliasEnabled"].toBool());
         QCOMPARE(saved["alias"].toString(), QString("legacy-id"));
+        // Likewise, a GUI from before the GPU layers option does not turn it back on.
+        QVERIFY(saved["gpuLayersEnabled"].toBool());
+        auto automatic = saved;
+        automatic["gpuLayersEnabled"] = false;
+        QVERIFY(rpc(socket, "updateProfile", { { "profileId", "legacy" }, { "profile", automatic } })["ok"].toBool());
+        automatic.remove("gpuLayersEnabled");
+        QVERIFY(rpc(socket, "updateProfile", { { "profileId", "legacy" }, { "profile", automatic } })["ok"].toBool());
+        QVERIFY(!instance(socket, "legacy")["profile"].toObject()["gpuLayersEnabled"].toBool(true));
         QVERIFY(rpc(socket, "shutdownAgent")["ok"].toBool());
         QVERIFY(agent.waitForFinished(20000));
     }
@@ -1255,10 +1282,10 @@ private slots:
                 while (peer->canReadLine()) {
                     const auto m = QJsonDocument::fromJson(peer->readLine()).object();
                     const auto command = m["command"].toString();
-                    const QJsonObject data = command == "getStatus" ? QJsonObject { { "instances", QJsonArray {} }, { "warning", "" } } : QJsonObject {};
+                    const QJsonObject data = command == "getStatus" ? QJsonObject { { "instances", QJsonArray { } }, { "warning", "" } } : QJsonObject { };
                     Protocol::send(peer, { { "version", 1 }, { "id", m["id"] }, { "ok", true }, { "error", "" }, { "data", data } });
                     if (command == "shutdownAgent") {
-                        Protocol::send(peer, { { "version", 1 }, { "event", "shutdown" }, { "data", QJsonObject {} } });
+                        Protocol::send(peer, { { "version", 1 }, { "event", "shutdown" }, { "data", QJsonObject { } } });
                         peer->flush();
                         old.close();
                         peer->disconnectFromServer();

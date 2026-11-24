@@ -349,6 +349,10 @@ AgentServer::Reply AgentServer::updateProfile(Instance* instance, const QJsonObj
         candidate.aliasEnabled = instance->profile.aliasEnabled;
         candidate.alias = instance->profile.alias;
     }
+    // Likewise for the GPU layers option, which it would otherwise turn back on.
+    if (!m["profile"].toObject().contains("gpuLayersEnabled")) {
+        candidate.gpuLayersEnabled = instance->profile.gpuLayersEnabled;
+    }
     auto list = profiles();
     list[instances.indexOf(instance)] = candidate;
     if (!persist(list, error)) {

@@ -5,8 +5,8 @@ namespace Protocol {
 constexpr int Version = 1;
 // Agent feature level, sent as `revision` in status snapshots (absent before 2). A GUI that
 // finds an older Agent asks the user to restart it, because an older Agent drops newer fields.
-// 2: alias option, throughput status.
-constexpr int Revision = 2;
+// 2: alias option, throughput status. 3: GPU layers option.
+constexpr int Revision = 3;
 constexpr qsizetype MaxFrame = 1024 * 1024;
 QString dataDirectory();
 QString endpoint(const QString& directory);

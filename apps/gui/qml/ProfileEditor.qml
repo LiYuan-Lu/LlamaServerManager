@@ -27,6 +27,7 @@ ColumnLayout {
         exe.text = p.executable || ""; model.text = p.model || ""; cwd.text = p.workingDirectory || ""
         host.text = p.host || "127.0.0.1"; port.text = String(entry ? (p.port || suggestedPort) : suggestedPort)
         context.text = String(p.context || 4096); gpu.text = String(p.gpuLayers === undefined ? 0 : p.gpuLayers)
+        gpuBox.checked = p.gpuLayersEnabled !== false
         threads.text = String(p.threads || 4); parallel.text = String(p.parallel || 1)
         metrics.checked = p.metrics || false
         autoStartBox.checked = p.autoStart === true
@@ -78,7 +79,7 @@ ColumnLayout {
             if (agent.agentOutdated) throw new Error(qsTr("The running Agent is older than this app and would drop new settings. Restart the Agent from the main page first."))
             validationError = ""
             const profile = {name: name.text.trim(), executable: exe.text, model: model.text, workingDirectory: cwd.text,
-                host: host.text, port: values[0], context: values[1], gpuLayers: values[2], threads: values[3], parallel: values[4],
+                host: host.text, port: values[0], context: values[1], gpuLayersEnabled: gpuBox.checked, gpuLayers: values[2], threads: values[3], parallel: values[4],
                 aliasEnabled: aliasBox.checked, alias: alias.text.trim(),
                 metrics: metrics.checked, autoStart: autoStartBox.checked, extraArguments: args, environment: variables,
                 watchdog: {autoRestart: autoRestart.checked, healthCheck: healthCheck.checked,
@@ -153,8 +154,12 @@ ColumnLayout {
         TextField { id: port; Layout.preferredWidth: 75; validator: IntValidator { bottom: 1; top: 65535 } onTextEdited: editor.dirty = true }
         Label { text: "Context" }
         TextField { id: context; Layout.preferredWidth: 85; validator: IntValidator { bottom: 1 } onTextEdited: editor.dirty = true }
-        Label { text: "GPU layers" }
-        TextField { id: gpu; Layout.preferredWidth: 65; validator: IntValidator { bottom: -1 } onTextEdited: editor.dirty = true }
+        CheckBox {
+            id: gpuBox; text: "GPU layers"; onClicked: editor.dirty = true
+            ToolTip.visible: hovered
+            ToolTip.text: qsTr("Pass -ngl with this number of layers. Turn it off to let llama-server choose how many layers fit on the GPU.")
+        }
+        TextField { id: gpu; Layout.preferredWidth: 65; enabled: gpuBox.checked; validator: IntValidator { bottom: -1 } onTextEdited: editor.dirty = true }
         Label { text: "Threads" }
         TextField { id: threads; Layout.preferredWidth: 65; validator: IntValidator { bottom: 1 } onTextEdited: editor.dirty = true }
         Label { text: "Parallel" }

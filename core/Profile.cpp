@@ -10,7 +10,7 @@
 QJsonObject Profile::toJson() const
 {
     return { { "id", id }, { "name", name }, { "executable", executable }, { "model", model }, { "workingDirectory", workingDirectory },
-        { "host", host }, { "port", port }, { "context", context }, { "gpuLayers", gpuLayers },
+        { "host", host }, { "port", port }, { "context", context }, { "gpuLayersEnabled", gpuLayersEnabled }, { "gpuLayers", gpuLayers },
         { "threads", threads }, { "parallel", parallel }, { "metrics", metrics }, { "autoStart", autoStart },
         { "aliasEnabled", aliasEnabled }, { "alias", alias },
         { "extraArguments", QJsonArray::fromStringList(extraArguments) }, { "environment", environment },
@@ -61,6 +61,12 @@ bool Profile::fromJson(const QJsonObject& o, Profile& p, QString& error)
         return false;
     }
     candidate.autoStart = o["autoStart"].toBool();
+    if (o.contains("gpuLayersEnabled") && !o["gpuLayersEnabled"].isBool()) {
+        error = "gpuLayersEnabled must be boolean";
+        return false;
+    }
+    // Profiles saved before the option always passed -ngl.
+    candidate.gpuLayersEnabled = o["gpuLayersEnabled"].toBool(true);
     if (o.contains("aliasEnabled") && !o["aliasEnabled"].isBool()) {
         error = "aliasEnabled must be boolean";
         return false;
@@ -161,8 +167,11 @@ QString Profile::validate(bool files) const
 }
 QStringList Profile::arguments() const
 {
-    QStringList a = { "-m", model, "-c", QString::number(context), "-ngl", QString::number(gpuLayers),
-        "-t", QString::number(threads), "--host", host, "--port", QString::number(port), "--parallel", QString::number(parallel) };
+    QStringList a = { "-m", model, "-c", QString::number(context) };
+    if (gpuLayersEnabled) {
+        a << "-ngl" << QString::number(gpuLayers);
+    }
+    a << "-t" << QString::number(threads) << "--host" << host << "--port" << QString::number(port) << "--parallel" << QString::number(parallel);
     if (metrics) {
         a << "--metrics";
     }

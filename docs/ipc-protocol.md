@@ -73,9 +73,11 @@ A history point: `{"time":<ms since epoch>,"cpu":<percent>,"ramUsed":<bytes>,"ra
 
 ## Profile fields
 
-Defaults: id/name/executable/model/workingDirectory are empty strings; host=127.0.0.1, port=8080, context=4096, gpuLayers=0, threads=4, parallel=1, metrics=false, autoStart=false, aliasEnabled=false, alias="", extraArguments=[], environment={}.
+Defaults: id/name/executable/model/workingDirectory are empty strings; host=127.0.0.1, port=8080, context=4096, gpuLayersEnabled=true, gpuLayers=0, threads=4, parallel=1, metrics=false, autoStart=false, aliasEnabled=false, alias="", extraArguments=[], environment={}.
 
 `aliasEnabled` / `alias`: when enabled, the alias is passed as `--alias`, so `GET /v1/models` reports it as the model ID instead of the model file path. An enabled alias must not be empty, have leading or trailing spaces, or contain commas or control characters; `-a` and `--alias` cannot be set through extraArguments. A profile without `aliasEnabled` was saved before the option existed: an `--alias`/`-a` in its extraArguments is moved into the option (the first ID of a comma-separated list), and the Agent saves the migrated profiles once, keeping the previous file as `profiles.json.bak`. `updateProfile` without `aliasEnabled` (an older GUI) keeps the model's current alias.
+
+`gpuLayersEnabled` / `gpuLayers`: when enabled, `gpuLayers` is passed as `-ngl`; when disabled, `-ngl` is left out so llama-server chooses how many layers to offload (newer builds fit the model to the available GPU memory), and `gpuLayers` is kept for when the option is turned back on. `-ngl`, `--gpu-layers`, and `--n-gpu-layers` cannot be set through extraArguments either way. A profile without `gpuLayersEnabled` was saved before the option existed and keeps passing `-ngl`; `updateProfile` without it (an older GUI) keeps the model's current setting. Added in revision 3.
 
 `autoStart`: when true, the Agent starts this model each time the Agent starts (after it begins listening). A failure, such as a port conflict, is added to the status `warning` and to the model's log; the Agent keeps running.
 

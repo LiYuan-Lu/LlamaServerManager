@@ -62,7 +62,10 @@ LlamaProcessManager::LlamaProcessManager(QObject* parent)
             return;
         }
         const QString output = QString::fromUtf8(help);
-        QStringList required { "-m", "-c", "-ngl", "-t", "--host", "--port", "--parallel" };
+        QStringList required { "-m", "-c", "-t", "--host", "--port", "--parallel" };
+        if (current.gpuLayersEnabled) {
+            required << "-ngl";
+        }
         if (current.metrics) {
             required << "--metrics";
         }
