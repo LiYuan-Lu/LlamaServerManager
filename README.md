@@ -194,6 +194,7 @@ Done:
 
 - **0.1.0** — GUI and Agent (Phase 1), watchdog (Phase 2), dashboard, multiple models, and console (Phase 3), profile duplication, auto start, and Stop Agent, desktop integration (Phase 4: system tray, start at sign-in, Windows installer), and prebuilt releases built by CI.
 - **0.2.0** — model alias, opencode config, generation speed on the cards and model page, and a prompt to restart an Agent left running from an older version.
+- **0.3.0** — extra arguments edited as rows instead of JSON, an optional GPU layers setting that lets llama-server choose the offload, and the Visual C++ runtime DLLs in zips built with Visual Studio 2026.
 
 Next:
 
